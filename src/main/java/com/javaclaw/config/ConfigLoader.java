@@ -9,7 +9,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 
 /**
- * 配置加载与保存。路径统一使用 javaclawbot：~/.javaclawbot/config.json、~/.javaclawbot、~/.javaclawbot/workspace。
+ * 配置加载与保存。路径统一使用 javaclawbot：项目根目录下的 .javaclawbot/config.json、.javaclawbot、.javaclawbot/workspace。
  */
 public final class ConfigLoader {
 
@@ -25,22 +25,22 @@ public final class ConfigLoader {
     }
 
     /**
-     * 默认配置文件路径：~/.javaclawbot/config.json
+     * 默认配置文件路径：项目根目录下的 .javaclawbot/config.json
      */
     public static Path getConfigPath() {
         return getDataDir().resolve(CONFIG_FILE);
     }
 
     /**
-     * 数据目录（cron、sessions 的父目录）：~/.javaclawbot
+     * 数据目录（cron、sessions 的父目录）：项目根目录下的 .javaclawbot
      */
     public static Path getDataDir() {
-        String home = System.getProperty("user.home");
-        return Paths.get(home).resolve(JAVACLAWBOT_DIR);
+        String projectRoot = System.getProperty("user.dir");
+        return Paths.get(projectRoot).resolve(JAVACLAWBOT_DIR);
     }
 
     /**
-     * 默认工作区路径：~/.javaclawbot/workspace
+     * 默认工作区路径：项目根目录下的 .javaclawbot/workspace
      */
     public static Path getDefaultWorkspacePath() {
         return getDataDir().resolve(DEFAULT_WORKSPACE);

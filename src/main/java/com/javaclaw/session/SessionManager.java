@@ -78,7 +78,7 @@ public class SessionManager {
     }
 
     private Path sessionFile(String key) {
-        String safe = key.replaceAll("[^a-zA-Z0-9:_-]", "_");
+        String safe = key.replaceAll("[^a-zA-Z0-9_-]", "_");
         return sessionsDir.resolve(safe + ".json");
     }
 }
