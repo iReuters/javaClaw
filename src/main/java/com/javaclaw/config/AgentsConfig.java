@@ -1,5 +1,7 @@
 package com.javaclaw.config;
 
+import lombok.Data;
+
 import java.util.Collections;
 import java.util.List;
 
@@ -7,6 +9,7 @@ import java.util.List;
  * Agent 默认配置：工作区、模型、Token 上限、温度、工具迭代次数、记忆窗口等。
  * 对应 config.json 中 agents 节点，键名 camelCase。
  */
+@Data
 public class AgentsConfig {
 
     /** 工作区路径（可为相对或 ~/.javaclawbot/workspace） */
@@ -26,67 +29,7 @@ public class AgentsConfig {
     /** 可选：指定 model 使用的 provider，未设则用 defaultProvider */
     private List<String> providerModels;
 
-    public String getWorkspace() {
-        return workspace;
-    }
-
-    public void setWorkspace(String workspace) {
-        this.workspace = workspace;
-    }
-
-    public String getModel() {
-        return model;
-    }
-
-    public void setModel(String model) {
-        this.model = model;
-    }
-
-    public int getMaxTokens() {
-        return maxTokens;
-    }
-
-    public void setMaxTokens(int maxTokens) {
-        this.maxTokens = maxTokens;
-    }
-
-    public double getTemperature() {
-        return temperature;
-    }
-
-    public void setTemperature(double temperature) {
-        this.temperature = temperature;
-    }
-
-    public int getMaxToolIterations() {
-        return maxToolIterations;
-    }
-
-    public void setMaxToolIterations(int maxToolIterations) {
-        this.maxToolIterations = maxToolIterations;
-    }
-
-    public int getMemoryWindow() {
-        return memoryWindow;
-    }
-
-    public void setMemoryWindow(int memoryWindow) {
-        this.memoryWindow = memoryWindow;
-    }
-
-    public String getDefaultProvider() {
-        return defaultProvider;
-    }
-
-    public void setDefaultProvider(String defaultProvider) {
-        this.defaultProvider = defaultProvider;
-    }
-
     public List<String> getProviderModels() {
         return providerModels == null ? Collections.<String>emptyList() : providerModels;
-    }
-
-    public void setProviderModels(List<String> providerModels) {
-        this.providerModels = providerModels;
     }
 }

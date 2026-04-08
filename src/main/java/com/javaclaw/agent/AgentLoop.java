@@ -2,7 +2,6 @@ package com.javaclaw.agent;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.javaclaw.bus.InboundMessage;
-import com.javaclaw.bus.MessageBus;
 import com.javaclaw.bus.OutboundMessage;
 import com.javaclaw.config.ExecToolConfig;
 import com.javaclaw.config.MCPServerConfig;
@@ -15,18 +14,16 @@ import com.javaclaw.agent.tools.*;
 
 import java.nio.file.Path;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 /**
- * Agent 主循环：消费 inbound、建会话/上下文、调 LLM、执行 tool_call、写回复/会话；支持 processDirect（CLI/Cron/Heartbeat）。
+ * Agent 主循环：处理消息、建会话/上下文、调 LLM、执行 tool_call、写回复/会话。
  */
 public class AgentLoop {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final String REFLECT_USER_MSG = "Reflect on the results and decide next steps.";
 
-    private final MessageBus bus;
     private final LLMProvider provider;
     private final Path workspace;
     private final String model;
@@ -42,12 +39,10 @@ public class AgentLoop {
     private final MemoryStore memoryStore;
     private final SkillsLoader skillsLoader;
 
-    private final AtomicBoolean running = new AtomicBoolean(true);
     private CronService cronService;
     private Map<String, MCPServerConfig> mcpServers;
 
-    public AgentLoop(MessageBus bus,
-                    LLMProvider provider,
+    public AgentLoop(LLMProvider provider,
                     Path workspace,
                     String model,
                     int maxIterations,
@@ -60,7 +55,6 @@ public class AgentLoop {
                     boolean restrictToWorkspace,
                     SessionManager sessionManager,
                     Map<String, MCPServerConfig> mcpServers) {
-        this.bus = bus;
         this.provider = provider;
         this.workspace = workspace != null ? workspace : java.nio.file.Paths.get(".");
         this.model = model != null && !model.isEmpty() ? model : provider.getDefaultModel();
@@ -80,29 +74,13 @@ public class AgentLoop {
         registerDefaultTools();
     }
 
-    /** 注册默认工具：read_file、write_file、list_dir、exec、message */
+    /** 注册默认工具：read_file、write_file、list_dir、exec、get_weather */
     private void registerDefaultTools() {
         toolRegistry.register(new ReadFileTool(workspace, restrictToWorkspace));
         toolRegistry.register(new WriteFileTool(workspace, restrictToWorkspace));
         toolRegistry.register(new ListDirTool(workspace, restrictToWorkspace));
         toolRegistry.register(new ExecTool(execConfig));
-        toolRegistry.register(new MessageTool(bus));
-    }
-
-    /** 主循环：不断 consumeInbound，processMessage，publishOutbound */
-    public void run() {
-        while (running.get()) {
-            try {
-                InboundMessage msg = bus.consumeInbound();
-                OutboundMessage response = processMessage(msg);
-                if (response != null) {
-                    bus.publishOutbound(response);
-                }
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                break;
-            }
-        }
+        toolRegistry.register(new com.javaclaw.agent.tools.WeatherTool());
     }
 
     /** 处理单条入站消息：session、命令、buildMessages、runAgentLoop、写 session、返回 OutboundMessage */
@@ -254,10 +232,6 @@ public class AgentLoop {
     /** 重载：带流式回调，用于 CLI 控制台逐字输出 */
     public String processDirect(String content, Consumer<String> streamConsumer) {
         return processDirect(content, "cli:direct", "cli", "direct", streamConsumer);
-    }
-
-    public void stop() {
-        running.set(false);
     }
 
     /** 关闭 MCP 连接（占位） */

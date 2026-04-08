@@ -1,5 +1,7 @@
 package com.javaclaw.session;
 
+import lombok.Data;
+
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -9,6 +11,7 @@ import java.util.Map;
 /**
  * 单次对话会话，消息为仅追加的列表。key 通常为 channel:chatId。
  */
+@Data
 public class Session {
 
     private String key;
@@ -58,51 +61,7 @@ public class Session {
         updatedAt = Instant.now();
     }
 
-    public String getKey() {
-        return key;
-    }
-
-    public void setKey(String key) {
-        this.key = key;
-    }
-
-    public List<Map<String, Object>> getMessages() {
-        return messages;
-    }
-
     public void setMessages(List<Map<String, Object>> messages) {
         this.messages = messages != null ? messages : new ArrayList<Map<String, Object>>();
-    }
-
-    public Instant getCreatedAt() {
-        return createdAt;
-    }
-
-    public void setCreatedAt(Instant createdAt) {
-        this.createdAt = createdAt;
-    }
-
-    public Instant getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public void setUpdatedAt(Instant updatedAt) {
-        this.updatedAt = updatedAt;
-    }
-
-    public Map<String, Object> getMetadata() {
-        return metadata;
-    }
-
-    public void setMetadata(Map<String, Object> metadata) {
-        this.metadata = metadata;
-    }
-
-    public Instant getLastConsolidated() {
-        return lastConsolidated;
-    }
-
-    public void setLastConsolidated(Instant lastConsolidated) {
-        this.lastConsolidated = lastConsolidated;
     }
 }

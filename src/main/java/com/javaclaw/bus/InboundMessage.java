@@ -1,5 +1,7 @@
 package com.javaclaw.bus;
 
+import lombok.Data;
+
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -10,6 +12,7 @@ import java.util.Map;
  * 渠道发往 Agent 的入站消息。Java 8 POJO，不含 Record。
  * 会话唯一键为 channel + ":" + chatId。
  */
+@Data
 public class InboundMessage {
 
     private String channel;
@@ -48,61 +51,5 @@ public class InboundMessage {
     /** 会话唯一键：channel + ":" + chatId */
     public String getSessionKey() {
         return channel + ":" + chatId;
-    }
-
-    public String getChannel() {
-        return channel;
-    }
-
-    public void setChannel(String channel) {
-        this.channel = channel;
-    }
-
-    public String getSenderId() {
-        return senderId;
-    }
-
-    public void setSenderId(String senderId) {
-        this.senderId = senderId;
-    }
-
-    public String getChatId() {
-        return chatId;
-    }
-
-    public void setChatId(String chatId) {
-        this.chatId = chatId;
-    }
-
-    public String getContent() {
-        return content;
-    }
-
-    public void setContent(String content) {
-        this.content = content;
-    }
-
-    public ZonedDateTime getTimestamp() {
-        return timestamp;
-    }
-
-    public void setTimestamp(ZonedDateTime timestamp) {
-        this.timestamp = timestamp;
-    }
-
-    public List<String> getMedia() {
-        return media;
-    }
-
-    public void setMedia(List<String> media) {
-        this.media = media;
-    }
-
-    public Map<String, Object> getMetadata() {
-        return metadata;
-    }
-
-    public void setMetadata(Map<String, Object> metadata) {
-        this.metadata = metadata;
     }
 }

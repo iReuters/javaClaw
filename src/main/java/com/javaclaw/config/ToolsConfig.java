@@ -1,11 +1,14 @@
 package com.javaclaw.config;
 
+import lombok.Data;
+
 import java.util.Collections;
 import java.util.Map;
 
 /**
  * 工具相关配置：exec 超时、restrictToWorkspace、mcpServers 等。对应 config.json 中 tools。
  */
+@Data
 public class ToolsConfig {
 
     private ExecToolConfig exec;
@@ -20,31 +23,7 @@ public class ToolsConfig {
         return exec == null ? new ExecToolConfig() : exec;
     }
 
-    public void setExec(ExecToolConfig exec) {
-        this.exec = exec;
-    }
-
-    public boolean isRestrictToWorkspace() {
-        return restrictToWorkspace;
-    }
-
-    public void setRestrictToWorkspace(boolean restrictToWorkspace) {
-        this.restrictToWorkspace = restrictToWorkspace;
-    }
-
     public Map<String, MCPServerConfig> getMcpServers() {
         return mcpServers == null ? Collections.<String, MCPServerConfig>emptyMap() : mcpServers;
-    }
-
-    public void setMcpServers(Map<String, MCPServerConfig> mcpServers) {
-        this.mcpServers = mcpServers;
-    }
-
-    public String getWebSearchApiKey() {
-        return webSearchApiKey;
-    }
-
-    public void setWebSearchApiKey(String webSearchApiKey) {
-        this.webSearchApiKey = webSearchApiKey;
     }
 }

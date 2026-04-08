@@ -94,7 +94,7 @@ public class OpenAICompatibleProvider implements LLMProvider {
         }
         try {
             String json = MAPPER.writeValueAsString(body);
-            Response response = client.newCall(req.post(RequestBody.create(json, JSON)).build()).execute();
+            Response response = client.newCall(req.post(RequestBody.create(JSON, json)).build()).execute();
             if (!response.isSuccessful()) {
                 String responseBody = response.body() != null ? response.body().string() : "";
                 LLMResponse err = new LLMResponse();
@@ -151,7 +151,7 @@ public class OpenAICompatibleProvider implements LLMProvider {
                         }
                         if (delta.has("content") && !delta.get("content").isNull()) {
                             String chunk = delta.get("content").asText();
-                            if (chunk != null) {
+                            if (chunk != null && !chunk.isEmpty()) {
                                 fullContent.append(chunk);
                                 if (streamConsumer != null) {
                                     streamConsumer.accept(chunk);
