@@ -26,4 +26,13 @@ public class ToolsConfig {
     public Map<String, MCPServerConfig> getMcpServers() {
         return mcpServers == null ? Collections.<String, MCPServerConfig>emptyMap() : mcpServers;
     }
+
+    // 手动添加getter方法，因为Lombok可能没有正确生成
+    public boolean isRestrictToWorkspace() {
+        return restrictToWorkspace;
+    }
+
+    public String getWebSearchApiKey() {
+        return webSearchApiKey;
+    }
 }

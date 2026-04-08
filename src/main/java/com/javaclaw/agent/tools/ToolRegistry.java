@@ -1,5 +1,10 @@
 package com.javaclaw.agent.tools;
 
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
+import javax.annotation.PostConstruct;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -10,9 +15,26 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * 工具注册表：注册、按名获取、getDefinitions（OpenAI function 列表）、execute。
  */
+@Component
+@Slf4j
 public class ToolRegistry {
 
     private final Map<String, Tool> tools = new ConcurrentHashMap<>();
+    private final List<Tool> toolBeans;
+
+    @Autowired
+    public ToolRegistry(List<Tool> toolBeans) {
+        this.toolBeans = toolBeans;
+    }
+
+    @PostConstruct
+    public void initialize() {
+        // 自动注册所有实现了Tool接口的Bean
+        for (Tool tool : toolBeans) {
+            register(tool);
+        }
+        log.info("Tools initialized {}:", toolBeans.size());
+    }
 
     public void register(Tool tool) {
         if (tool != null) {

@@ -1,16 +1,22 @@
 package com.javaclaw.heartbeat;
 
+import org.springframework.stereotype.Component;
+
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * 心跳/主动唤醒：定时调用 agent.processDirect(prompt)。当前为占位，start 后不实际调度。
  */
+@Component
 public class HeartbeatService {
 
-    private final HeartbeatCallback callback;
+    private volatile HeartbeatCallback callback;
     private final AtomicBoolean running = new AtomicBoolean(false);
 
-    public HeartbeatService(HeartbeatCallback callback) {
+    public HeartbeatService() {
+    }
+
+    public void setCallback(HeartbeatCallback callback) {
         this.callback = callback;
     }
 

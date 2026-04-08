@@ -2,6 +2,7 @@ package com.javaclaw.providers;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -27,6 +28,7 @@ import java.util.concurrent.TimeUnit;
  * 通过 HTTP 调用 OpenAI 兼容 API 的 LLMProvider 实现（Java 8）。
  * 使用 OkHttp 发送 POST /v1/chat/completions，解析 JSON 得到 content、tool_calls 等。
  */
+@Slf4j
 public class OpenAICompatibleProvider implements LLMProvider {
 
     private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
@@ -94,9 +96,35 @@ public class OpenAICompatibleProvider implements LLMProvider {
         }
         try {
             String json = MAPPER.writeValueAsString(body);
+            
+            // 构建消息摘要，显示每条消息的角色和内容前100个字符
+            StringBuilder messageSummary = new StringBuilder();
+            if (messages != null) {
+                for (int i = 0; i < messages.size(); i++) {
+                    Map<String, Object> msg = messages.get(i);
+                    String role = msg.get("role") != null ? msg.get("role").toString() : "unknown";
+                    String content = msg.get("content") != null ? msg.get("content").toString() : "";
+                    String contentSummary = content.length() > 100 ? content.substring(0, 100) + "..." : content;
+                    messageSummary.append(String.format("[%d] %s: %s\n", i, role, contentSummary));
+                }
+            }
+            
+            log.info("Sending request to LLM: model={}, url={}, messages_size={}, tools_size={}", 
+                    model != null && !model.isEmpty() ? model : defaultModel, 
+                    url, 
+                    messages != null ? messages.size() : 0, 
+                    tools != null ? tools.size() : 0);
+            log.info("LLM request messages:\n{}", messageSummary.toString());
+            log.debug("LLM request body: {}", json);
+            
             Response response = client.newCall(req.post(RequestBody.create(JSON, json)).build()).execute();
+            
             if (!response.isSuccessful()) {
                 String responseBody = response.body() != null ? response.body().string() : "";
+                log.error("LLM request failed: code={}, message={}, body={}", 
+                        response.code(), 
+                        response.message(), 
+                        responseBody);
                 LLMResponse err = new LLMResponse();
                 String detail = parseErrorBody(responseBody);
                 err.setContent("[LLM error: " + response.code() + " " + response.message()
@@ -104,12 +132,32 @@ public class OpenAICompatibleProvider implements LLMProvider {
                         + "]");
                 return err;
             }
+            
+            LLMResponse llmResponse;
             if (useStream && response.body() != null) {
-                return parseStreamResponse(response.body().byteStream(), streamConsumer);
+                llmResponse = parseStreamResponse(response.body().byteStream(), streamConsumer);
+            } else {
+                String responseBody = response.body() != null ? response.body().string() : "";
+                log.debug("LLM response body: {}", responseBody);
+                llmResponse = parseResponse(responseBody);
             }
-            String responseBody = response.body() != null ? response.body().string() : "";
-            return parseResponse(responseBody);
+            
+            // 构建响应摘要，显示内容前200个字符
+            String contentSummary = llmResponse.getContent() != null 
+                    ? (llmResponse.getContent().length() > 200 
+                        ? llmResponse.getContent().substring(0, 200) + "..." 
+                        : llmResponse.getContent()) 
+                    : "";
+            
+            log.info("LLM response received: content_length={}, has_tool_calls={}, finish_reason={}", 
+                    llmResponse.getContent() != null ? llmResponse.getContent().length() : 0, 
+                    llmResponse.hasToolCalls(), 
+                    llmResponse.getFinishReason());
+            log.info("LLM response content summary:\n{}", contentSummary);
+            
+            return llmResponse;
         } catch (IOException e) {
+            log.error("Error sending request to LLM", e);
             LLMResponse err = new LLMResponse();
             err.setContent("[LLM error: " + e.getMessage() + "]");
             return err;

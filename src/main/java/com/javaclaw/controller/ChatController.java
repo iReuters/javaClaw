@@ -5,7 +5,6 @@ import com.javaclaw.bus.InboundMessage;
 import com.javaclaw.bus.OutboundMessage;
 import com.javaclaw.config.Config;
 import com.javaclaw.providers.LLMProvider;
-import com.javaclaw.providers.ProviderFactory;
 import com.javaclaw.session.SessionManager;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -17,8 +16,6 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -30,45 +27,15 @@ public class ChatController {
     private final ExecutorService executorService;
 
     @Autowired
-    public ChatController(Config config) throws IOException {
-        // 初始化会话管理器
-        Path dataDir = Paths.get(".javaclawbot");
-        SessionManager sessionManager = new SessionManager(dataDir);
-        
-        // 初始化工作区
-        Path workspace = dataDir.resolve("workspace");
-        
-        // 初始化 LLM 提供商
-        LLMProvider provider = ProviderFactory.fromConfig(config);
-        
-        // 初始化 AgentLoop
-        this.agentLoop = new AgentLoop(
-                provider,
-                workspace,
-                config.getAgents().getModel(),
-                config.getAgents().getMaxToolIterations(),
-                config.getAgents().getTemperature(),
-                config.getAgents().getMaxTokens(),
-                config.getAgents().getMemoryWindow(),
-                config.getTools().getWebSearchApiKey(),
-                config.getTools().getExec(),
-                null, // cronService
-                config.getTools().isRestrictToWorkspace(),
-                sessionManager,
-                config.getTools().getMcpServers()
-        );
-        
-        // 初始化线程池用于处理流式响应
+    public ChatController(AgentLoop agentLoop) {
+        this.agentLoop = agentLoop;
         this.executorService = Executors.newFixedThreadPool(10);
     }
 
     @PostMapping("/chat")
     public OutboundMessage chat(@RequestBody ChatRequest request) {
         // 创建入站消息
-        InboundMessage message = new InboundMessage();
-        message.setChannel("web");
-        message.setChatId("direct");
-        message.setContent(request.getMessage());
+        InboundMessage message = new InboundMessage("web", "user", "direct", request.getMessage());
         
         // 处理消息
         return agentLoop.processMessage(message, request.getSessionKey() != null ? request.getSessionKey() : "web:direct", null);
@@ -81,10 +48,7 @@ public class ChatController {
         executorService.execute(() -> {
             try {
                 // 创建入站消息
-                InboundMessage message = new InboundMessage();
-                message.setChannel("web");
-                message.setChatId("direct");
-                message.setContent(request.getMessage());
+                InboundMessage message = new InboundMessage("web", "user", "direct", request.getMessage());
                 
                 // 处理消息，使用流式响应
                 OutboundMessage response = agentLoop.processMessage(

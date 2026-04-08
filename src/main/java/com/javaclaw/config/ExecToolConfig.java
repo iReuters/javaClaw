@@ -10,4 +10,9 @@ public class ExecToolConfig {
 
     /** 单次执行超时秒数 */
     private int timeoutSeconds = 60;
+
+    // 手动添加getter方法，因为Lombok可能没有正确生成
+    public int getTimeoutSeconds() {
+        return timeoutSeconds;
+    }
 }

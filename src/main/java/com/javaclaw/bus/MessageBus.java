@@ -1,5 +1,7 @@
 package com.javaclaw.bus;
 
+import org.springframework.stereotype.Component;
+
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -9,6 +11,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * 异步消息总线：解耦渠道与 Agent。使用 BlockingQueue 实现入站/出站队列。
  * 渠道 publishInbound，Agent consumeInbound；Agent/Cron publishOutbound，分发循环 consumeOutbound。
  */
+@Component
 public class MessageBus {
 
     private final BlockingQueue<InboundMessage> inbound;

@@ -3,11 +3,14 @@ package com.javaclaw.session;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -15,6 +18,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * 按 key 管理会话的获取、保存与缓存。会话文件存放在 dataDir/sessions/ 下（与 workspace 解耦）。
  * 构造时传入数据目录，会话存于 dataDir/sessions/；若需与 Config 一致则传入 ConfigLoader.getSessionsDir() 的父目录并内部 resolve("sessions")，或直接传入 ConfigLoader.getSessionsDir() 作为会话根。
  */
+@Component
 public class SessionManager {
 
     private final Path sessionsDir;
@@ -26,8 +30,13 @@ public class SessionManager {
     /**
      * @param sessionsRoot 会话根目录（如 ~/.javaclawbot/sessions），会话文件为 sessionsRoot/{sanitizedKey}.json
      */
-    public SessionManager(Path sessionsRoot) {
-        this.sessionsDir = sessionsRoot;
+    public SessionManager(@Value("${javaclaw.agents.workspace:.javaclawbot/workspace}") String workspacePath) {
+        Path workspace = Paths.get(workspacePath);
+        Path dataDir = workspace.getParent();
+        if (dataDir == null) {
+            dataDir = Paths.get(".javaclawbot");
+        }
+        this.sessionsDir = dataDir.resolve("sessions");
     }
 
     /** 按 key 取缓存或从磁盘加载，不存在则新建 */

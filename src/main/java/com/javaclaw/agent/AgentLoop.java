@@ -10,18 +10,22 @@ import com.javaclaw.providers.LLMProvider;
 import com.javaclaw.providers.ToolCallRequest;
 import com.javaclaw.session.Session;
 import com.javaclaw.session.SessionManager;
-import com.javaclaw.agent.tools.*;
+import com.javaclaw.agent.tools.ToolRegistry;
 
 import java.nio.file.Path;
 import java.util.*;
 import java.util.function.Consumer;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 
 /**
  * Agent 主循环：处理消息、建会话/上下文、调 LLM、执行 tool_call、写回复/会话。
  */
 public class AgentLoop {
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final Logger log = LoggerFactory.getLogger(AgentLoop.class);    private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final String REFLECT_USER_MSG = "Reflect on the results and decide next steps.";
 
     private final LLMProvider provider;
@@ -42,6 +46,7 @@ public class AgentLoop {
     private CronService cronService;
     private Map<String, MCPServerConfig> mcpServers;
 
+    @Autowired
     public AgentLoop(LLMProvider provider,
                     Path workspace,
                     String model,
@@ -54,7 +59,8 @@ public class AgentLoop {
                     CronService cronService,
                     boolean restrictToWorkspace,
                     SessionManager sessionManager,
-                    Map<String, MCPServerConfig> mcpServers) {
+                    Map<String, MCPServerConfig> mcpServers,
+                    ToolRegistry toolRegistry) {
         this.provider = provider;
         this.workspace = workspace != null ? workspace : java.nio.file.Paths.get(".");
         this.model = model != null && !model.isEmpty() ? model : provider.getDefaultModel();
@@ -70,17 +76,7 @@ public class AgentLoop {
         this.memoryStore = new MemoryStore(this.workspace);
         this.skillsLoader = new SkillsLoader(this.workspace, null);
         this.contextBuilder = new ContextBuilder(this.workspace, null, memoryStore, skillsLoader);
-        this.toolRegistry = new ToolRegistry();
-        registerDefaultTools();
-    }
-
-    /** 注册默认工具：read_file、write_file、list_dir、exec、get_weather */
-    private void registerDefaultTools() {
-        toolRegistry.register(new ReadFileTool(workspace, restrictToWorkspace));
-        toolRegistry.register(new WriteFileTool(workspace, restrictToWorkspace));
-        toolRegistry.register(new ListDirTool(workspace, restrictToWorkspace));
-        toolRegistry.register(new ExecTool(execConfig));
-        toolRegistry.register(new com.javaclaw.agent.tools.WeatherTool());
+        this.toolRegistry = toolRegistry;
     }
 
     /** 处理单条入站消息：session、命令、buildMessages、runAgentLoop、写 session、返回 OutboundMessage */

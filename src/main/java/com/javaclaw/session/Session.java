@@ -64,4 +64,33 @@ public class Session {
     public void setMessages(List<Map<String, Object>> messages) {
         this.messages = messages != null ? messages : new ArrayList<Map<String, Object>>();
     }
+
+    // 手动添加getter方法，因为Lombok可能没有正确生成
+    public String getKey() {
+        return key;
+    }
+
+    public List<Map<String, Object>> getMessages() {
+        return messages;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+
+    public Instant getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public Map<String, Object> getMetadata() {
+        return metadata;
+    }
+
+    public Instant getLastConsolidated() {
+        return lastConsolidated;
+    }
+
+    public void setLastConsolidated(Instant lastConsolidated) {
+        this.lastConsolidated = lastConsolidated;
+    }
 }

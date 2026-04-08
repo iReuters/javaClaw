@@ -1,5 +1,7 @@
 package com.javaclaw.agent;
 
+import lombok.extern.slf4j.Slf4j;
+
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -12,6 +14,7 @@ import java.util.Map;
 /**
  * 组装发给 LLM 的 system prompt 与消息列表：身份、bootstrap 文件、记忆、技能；buildMessages、addToolResult、addAssistantMessage。
  */
+@Slf4j
 public class ContextBuilder {
 
     private static final String[] BOOTSTRAP_FILES = {"AGENTS.md", "SOUL.md", "USER.md", "TOOLS.md", "IDENTITY.md"};

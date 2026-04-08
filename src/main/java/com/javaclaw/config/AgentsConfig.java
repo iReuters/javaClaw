@@ -32,4 +32,33 @@ public class AgentsConfig {
     public List<String> getProviderModels() {
         return providerModels == null ? Collections.<String>emptyList() : providerModels;
     }
+
+    // 手动添加getter方法，因为Lombok可能没有正确生成
+    public String getWorkspace() {
+        return workspace;
+    }
+
+    public String getModel() {
+        return model;
+    }
+
+    public int getMaxTokens() {
+        return maxTokens;
+    }
+
+    public double getTemperature() {
+        return temperature;
+    }
+
+    public int getMaxToolIterations() {
+        return maxToolIterations;
+    }
+
+    public int getMemoryWindow() {
+        return memoryWindow;
+    }
+
+    public String getDefaultProvider() {
+        return defaultProvider;
+    }
 }
