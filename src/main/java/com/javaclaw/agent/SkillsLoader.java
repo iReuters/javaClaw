@@ -131,9 +131,14 @@ public class SkillsLoader {
         return sb.toString();
     }
 
-    /** 返回需常驻加载的技能名列表（由 SKILL 元数据决定；暂无元数据时返回空） */
+    /** 返回需常驻加载的技能名列表（由 SKILL 元数据决定；暂无元数据时返回所有技能） */
     public List<String> getAlwaysSkills() {
-        return Collections.emptyList();
+        List<Map<String, String>> skills = listSkills(false);
+        List<String> skillNames = new ArrayList<>();
+        for (Map<String, String> skill : skills) {
+            skillNames.add(skill.get("name"));
+        }
+        return skillNames;
     }
 
     /** 返回技能元数据（如依赖、available 等）；简单实现可只返回 empty */

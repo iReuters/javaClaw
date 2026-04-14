@@ -104,7 +104,7 @@ public class OpenAICompatibleProvider implements LLMProvider {
                     Map<String, Object> msg = messages.get(i);
                     String role = msg.get("role") != null ? msg.get("role").toString() : "unknown";
                     String content = msg.get("content") != null ? msg.get("content").toString() : "";
-                    String contentSummary = content.length() > 100 ? content.substring(0, 100) + "..." : content;
+                    String contentSummary = content.length() > 10000 ? content.substring(0, 10000) + "..." : content;
                     messageSummary.append(String.format("[%d] %s: %s\n", i, role, contentSummary));
                 }
             }

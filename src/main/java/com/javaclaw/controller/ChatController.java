@@ -43,7 +43,8 @@ public class ChatController {
 
     @PostMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter streamChat(@RequestBody ChatRequest request) {
-        SseEmitter emitter = new SseEmitter();
+        // 超时时间设为 5 分钟，确保长对话不会中断
+        SseEmitter emitter = new SseEmitter(5 * 60 * 1000L);
         
         executorService.execute(() -> {
             try {

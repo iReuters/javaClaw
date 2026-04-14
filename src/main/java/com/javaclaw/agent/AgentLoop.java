@@ -61,7 +61,7 @@ public class AgentLoop {
                     Map<String, MCPServerConfig> mcpServers,
                     ToolRegistry toolRegistry) {
         this.provider = provider;
-        this.workspace = workspace != null ? workspace : java.nio.file.Paths.get(".");
+        this.workspace = workspace != null ? workspace : java.nio.file.Paths.get(".", ".javaclawbot");
         this.model = model != null && !model.isEmpty() ? model : provider.getDefaultModel();
         this.maxIterations = maxIterations > 0 ? maxIterations : 10;
         this.temperature = temperature >= 0 ? temperature : 0.7;
