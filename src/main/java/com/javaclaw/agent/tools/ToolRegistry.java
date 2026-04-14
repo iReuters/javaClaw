@@ -5,15 +5,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.PostConstruct;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * 工具注册表：注册、按名获取、getDefinitions（OpenAI function 列表）、execute。
+ * 工具注册表：管理 Spring Bean 工具（已注册 Tool 实现）。
+ * 动态工具由 DynamicToolLoader 独立管理，不在此注册。
  */
 @Component
 @Slf4j
@@ -29,11 +26,10 @@ public class ToolRegistry {
 
     @PostConstruct
     public void initialize() {
-        // 自动注册所有实现了Tool接口的Bean
         for (Tool tool : toolBeans) {
             register(tool);
         }
-        log.info("Tools initialized {}:", toolBeans.size());
+        log.info("Tools initialized (beans): {}", toolBeans.size());
     }
 
     public void register(Tool tool) {
@@ -54,16 +50,16 @@ public class ToolRegistry {
         return tools.containsKey(name);
     }
 
-    /** 所有工具的 OpenAI function 定义，供 provider.chat(tools=...) 使用 */
+    /** 所有 Bean 工具的 OpenAI function 定义 */
     public List<Map<String, Object>> getDefinitions() {
         List<Map<String, Object>> out = new ArrayList<>();
         for (Tool t : tools.values()) {
             if (t instanceof BaseTool) {
                 out.add(((BaseTool) t).toSchema());
             } else {
-                Map<String, Object> fn = new java.util.HashMap<>();
+                Map<String, Object> fn = new HashMap<>();
                 fn.put("type", "function");
-                Map<String, Object> f = new java.util.HashMap<>();
+                Map<String, Object> f = new HashMap<>();
                 f.put("name", t.getName());
                 f.put("description", t.getDescription());
                 f.put("parameters", t.getParameters());
@@ -74,7 +70,7 @@ public class ToolRegistry {
         return out;
     }
 
-    /** 校验后执行指定工具，返回结果字符串；未找到或校验失败返回错误信息字符串。params 可含框架注入的 channel、chatId、metadata。 */
+    /** 执行 Bean 工具 */
     public String execute(String name, Map<String, Object> params) {
         Tool tool = tools.get(name);
         if (tool == null) {

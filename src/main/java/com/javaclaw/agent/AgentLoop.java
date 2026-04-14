@@ -11,6 +11,8 @@ import com.javaclaw.providers.ToolCallRequest;
 import com.javaclaw.session.Session;
 import com.javaclaw.session.SessionManager;
 import com.javaclaw.agent.tools.ToolRegistry;
+import com.javaclaw.agent.tools.DynamicTool;
+import com.javaclaw.agent.tools.DynamicToolLoader;
 
 import java.nio.file.Path;
 import java.util.*;
@@ -39,6 +41,7 @@ public class AgentLoop {
     private final boolean restrictToWorkspace;
     private final SessionManager sessionManager;
     private final ToolRegistry toolRegistry;
+    private final DynamicToolLoader dynamicToolLoader;
     private final ContextBuilder contextBuilder;
     private final SkillsLoader skillsLoader;
 
@@ -59,7 +62,8 @@ public class AgentLoop {
                     boolean restrictToWorkspace,
                     SessionManager sessionManager,
                     Map<String, MCPServerConfig> mcpServers,
-                    ToolRegistry toolRegistry) {
+                    ToolRegistry toolRegistry,
+                    DynamicToolLoader dynamicToolLoader) {
         this.provider = provider;
         this.workspace = workspace != null ? workspace : java.nio.file.Paths.get(".", ".javaclawbot");
         this.model = model != null && !model.isEmpty() ? model : provider.getDefaultModel();
@@ -75,6 +79,7 @@ public class AgentLoop {
         this.skillsLoader = new SkillsLoader(this.workspace, null);
         this.contextBuilder = new ContextBuilder(this.workspace, null, skillsLoader);
         this.toolRegistry = toolRegistry;
+        this.dynamicToolLoader = dynamicToolLoader;
     }
 
     /** 处理单条入站消息：session、命令、buildMessages、runAgentLoop、写 session、返回 OutboundMessage */
@@ -125,7 +130,9 @@ public class AgentLoop {
         List<String> skillNames = skillsLoader.getAlwaysSkills();
         List<Map<String, Object>> initialMessages = contextBuilder.buildMessages(
                 history, content, skillNames, msg.getMedia(), channel, chatId);
-        RunResult result = runAgentLoop(initialMessages, streamConsumer, requestContext);
+        // 传入 skillName 用于工具过滤（取第一个 skill）
+        String activeSkill = (skillNames != null && !skillNames.isEmpty()) ? skillNames.get(0) : null;
+        RunResult result = runAgentLoop(initialMessages, streamConsumer, requestContext, activeSkill);
         session.addMessage("user", content, null);
         session.addMessage("assistant", result.getContent(), null);
         sessionManager.save(session);
@@ -148,14 +155,34 @@ public class AgentLoop {
     }
 
     public RunResult runAgentLoop(List<Map<String, Object>> initialMessages, Consumer<String> streamConsumer, Map<String, Object> requestContext) {
+        return runAgentLoop(initialMessages, streamConsumer, requestContext, null);
+    }
+
+    /**
+     * 带 skill 名称的 runAgentLoop，用于过滤工具定义
+     */
+    public RunResult runAgentLoop(List<Map<String, Object>> initialMessages, Consumer<String> streamConsumer, Map<String, Object> requestContext, String skillName) {
         List<Map<String, Object>> messages = new ArrayList<>(initialMessages);
         List<String> toolsUsed = new ArrayList<>();
         int iter = 0;
+
+        // 根据 skill 获取工具定义（合并 Bean 工具和动态工具）
+        List<Map<String, Object>> toolDefs = new ArrayList<>(toolRegistry.getDefinitions());
+        if (dynamicToolLoader != null) {
+            List<String> skillTools = dynamicToolLoader.getToolsForSkill(skillName);
+            for (String toolName : skillTools) {
+                DynamicTool dt = dynamicToolLoader.getDynamicTool(toolName);
+                if (dt != null) {
+                    toolDefs.add(dt.toSchema());
+                }
+            }
+        }
+
         while (iter < maxIterations) {
             iter++;
             com.javaclaw.providers.LLMResponse response = provider.chat(
                     messages,
-                    toolRegistry.getDefinitions(),
+                    toolDefs,
                     model,
                     maxTokens,
                     temperature,
@@ -185,7 +212,7 @@ public class AgentLoop {
                     if (requestContext != null) {
                         params.putAll(requestContext);
                     }
-                    String result = toolRegistry.execute(tc.getName(), params);
+                    String result = executeTool(tc.getName(), params);
                     toolsUsed.add(tc.getName());
                     contextBuilder.addToolResult(messages, tc.getId(), tc.getName(), result);
                 }
@@ -199,6 +226,19 @@ public class AgentLoop {
             }
         }
         return new RunResult("[Max tool iterations reached]", toolsUsed);
+    }
+
+    /** 执行工具（优先 Bean 工具，再动态工具） */
+    private String executeTool(String name, Map<String, Object> params) {
+        // 先尝试 Bean 工具
+        if (toolRegistry.has(name)) {
+            return toolRegistry.execute(name, params);
+        }
+        // 再尝试动态工具
+        if (dynamicToolLoader != null && dynamicToolLoader.getDynamicTool(name) != null) {
+            return dynamicToolLoader.executeDynamicTool(name, params);
+        }
+        return "[Error: tool not found: " + name + "]";
     }
 
     /** 直接处理一条用户消息（不经过总线），返回 Agent 回复文本。用于 CLI、Cron、Heartbeat。 */

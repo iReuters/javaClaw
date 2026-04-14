@@ -1,0 +1,21 @@
+javaclaw:
+  skills:
+    tools:
+      # skill名称 -> 该skill可用的工具列表
+      # 工具来源：
+      # 1. Spring Bean 工具：直接使用工具名（如 get_weather）
+      # 2. 动态工具：在 .javaclawbot/tools/ 目录下创建 .json 文件
+      munger-perspective:
+        - get_weather
+        - get_exchange_rate
+      zhangxuefeng-skill:
+        - get_weather
+        - get_exchange_rate
+      tool-demo-skill:
+        - get_weather
+        - get_server_time
+        - calculate
+    # 全局默认工具，所有 skill 都会加载
+    default:
+      - get_weather
+      - get_exchange_rate

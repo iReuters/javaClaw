@@ -2,6 +2,7 @@ package com.javaclaw.config;
 
 import com.javaclaw.agent.AgentLoop;
 import com.javaclaw.agent.tools.ToolRegistry;
+import com.javaclaw.agent.tools.DynamicToolLoader;
 import com.javaclaw.providers.LLMProvider;
 import com.javaclaw.session.SessionManager;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,6 +26,9 @@ public class AppConfig {
     @Autowired
     private ToolRegistry toolRegistry;
 
+    @Autowired(required = false)
+    private DynamicToolLoader dynamicToolLoader;
+
     @Bean
     public AgentLoop agentLoop() {
         // 初始化工作区
@@ -32,7 +36,7 @@ public class AppConfig {
         if (workspacePath == null || workspacePath.isEmpty()) {
             workspacePath = ".javaclawbot/workspace";
         }
-        
+
         return new AgentLoop(
                 llmProvider,
                 Paths.get(workspacePath),
@@ -47,7 +51,8 @@ public class AppConfig {
                 config.getTools().isRestrictToWorkspace(),
                 sessionManager,
                 config.getTools().getMcpServers(),
-                toolRegistry
+                toolRegistry,
+                dynamicToolLoader
         );
     }
 }

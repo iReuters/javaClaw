@@ -143,6 +143,105 @@ public class SkillsLoader {
 
     /** 返回技能元数据（如依赖、available 等）；简单实现可只返回 empty */
     public Optional<Map<String, Object>> getSkillMetadata(String name) {
-        return Optional.empty();
+        Optional<String> content = loadSkill(name);
+        if (!content.isPresent()) {
+            return Optional.empty();
+        }
+        return parseMetadata(content.get());
+    }
+
+    /** 从 SKILL.md 解析元数据（name, description, available, tools） */
+    private Optional<Map<String, Object>> parseMetadata(String content) {
+        Map<String, Object> meta = new HashMap<>();
+        String[] lines = content.split("\n");
+        boolean inFrontMatter = false;
+        String currentKey = null;
+        StringBuilder currentValue = new StringBuilder();
+
+        for (String line : lines) {
+            if (line.trim().equals("---")) {
+                if (inFrontMatter) {
+                    // 结束front matter
+                    if (currentKey != null && currentValue.length() > 0) {
+                        String value = currentValue.toString().trim();
+                        if (value.startsWith("[") && value.endsWith("]")) {
+                            // 解析数组
+                            List<String> items = new ArrayList<>();
+                            String arrayContent = value.substring(1, value.length() - 1);
+                            for (String item : arrayContent.split(",")) {
+                                String trimmed = item.trim();
+                                if (!trimmed.isEmpty()) {
+                                    items.add(trimmed);
+                                }
+                            }
+                            meta.put(currentKey, items);
+                        } else {
+                            meta.put(currentKey, value);
+                        }
+                    }
+                    break;
+                } else {
+                    inFrontMatter = true;
+                    currentKey = null;
+                    currentValue = new StringBuilder();
+                }
+                continue;
+            }
+
+            if (inFrontMatter) {
+                if (line.startsWith(" ") || line.startsWith("\t")) {
+                    // 续行
+                    currentValue.append(" ").append(line.trim());
+                } else if (line.contains(":")) {
+                    // 保存上一个key
+                    if (currentKey != null && currentValue.length() > 0) {
+                        String value = currentValue.toString().trim();
+                        if (value.startsWith("[") && value.endsWith("]")) {
+                            List<String> items = new ArrayList<>();
+                            String arrayContent = value.substring(1, value.length() - 1);
+                            for (String item : arrayContent.split(",")) {
+                                String trimmed = item.trim();
+                                if (!trimmed.isEmpty()) {
+                                    items.add(trimmed);
+                                }
+                            }
+                            meta.put(currentKey, items);
+                        } else {
+                            meta.put(currentKey, value);
+                        }
+                    }
+                    // 解析新key
+                    int colonIdx = line.indexOf(":");
+                    currentKey = line.substring(0, colonIdx).trim();
+                    currentValue = new StringBuilder();
+                    String rest = line.substring(colonIdx + 1).trim();
+                    if (!rest.isEmpty()) {
+                        currentValue.append(rest);
+                    }
+                }
+            }
+        }
+
+        return Optional.of(meta);
+    }
+
+    /** 获取指定skill声明的tools列表（从SKILL.md元数据解析） */
+    public List<String> getSkillTools(String name) {
+        Optional<Map<String, Object>> meta = getSkillMetadata(name);
+        if (!meta.isPresent()) {
+            return Collections.emptyList();
+        }
+        Object tools = meta.get().get("tools");
+        if (tools instanceof List) {
+            List<?> list = (List<?>) tools;
+            List<String> result = new ArrayList<>();
+            for (Object item : list) {
+                if (item != null) {
+                    result.add(item.toString());
+                }
+            }
+            return result;
+        }
+        return Collections.emptyList();
     }
 }
