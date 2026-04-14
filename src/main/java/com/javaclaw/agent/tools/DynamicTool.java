@@ -8,17 +8,34 @@ import lombok.Setter;
 import java.util.*;
 
 /**
- * 动态工具：基于JSON配置定义的工具，支持带参数和不带参数两种模式。
+ * 动态工具：基于JSON配置定义的工具，支持多种执行类型。
+ *
  * 配置示例（存为 .json 文件）：
  *
- * 无参数工具：
+ * 1. 调用Spring Bean（type=bean）：
+ * {
+ *   "name": "get_weather",
+ *   "description": "查询天气",
+ *   "type": "bean",
+ *   "beanName": "weatherService",
+ *   "method": "getWeather",
+ *   "parameters": {
+ *     "type": "object",
+ *     "properties": {
+ *       "city": {"type": "string", "description": "城市名"}
+ *     },
+ *     "required": ["city"]
+ *   }
+ * }
+ *
+ * 2. 无参数工具：
  * {
  *   "name": "get_server_time",
  *   "description": "获取当前服务器时间",
  *   "parameters": {}
  * }
  *
- * 带参数工具：
+ * 3. 带参数工具（静态模板）：
  * {
  *   "name": "query_stock",
  *   "description": "查询股票价格",
@@ -31,7 +48,8 @@ import java.util.*;
  *       }
  *     },
  *     "required": ["symbol"]
- *   }
+ *   },
+ *   "response": "股票 %symbol% 的价格是 $100"
  * }
  */
 @Getter
@@ -42,6 +60,11 @@ public class DynamicTool extends BaseTool {
     private String description;
     private Map<String, Object> parameters;
     private String responseTemplate;
+
+    // Bean调用类型配置
+    private String type;       // bean, script, exec 或 null（默认静态模板）
+    private String beanName;   // Spring Bean名称
+    private String method;     // 方法名
 
     // 存储原始配置，用于热更新比对
     @Setter
@@ -77,6 +100,31 @@ public class DynamicTool extends BaseTool {
     @JsonProperty("response")
     public void setResponseTemplate(String responseTemplate) {
         this.responseTemplate = responseTemplate;
+    }
+
+    @JsonProperty("type")
+    public void setType(String type) {
+        this.type = type;
+    }
+
+    @JsonProperty("beanName")
+    public void setBeanName(String beanName) {
+        this.beanName = beanName;
+    }
+
+    @JsonProperty("method")
+    public void setMethod(String method) {
+        this.method = method;
+    }
+
+    /** 判断是否为Bean调用类型 */
+    public boolean isBeanCall() {
+        return "bean".equals(type);
+    }
+
+    /** 判断是否有有效的Bean调用配置 */
+    public boolean hasValidBeanConfig() {
+        return isBeanCall() && beanName != null && !beanName.isEmpty() && method != null && !method.isEmpty();
     }
 
     public DynamicTool(String name, String description, Map<String, Object> parameters, String responseTemplate) {
