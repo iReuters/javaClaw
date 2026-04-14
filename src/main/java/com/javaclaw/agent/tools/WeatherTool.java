@@ -1,11 +1,14 @@
 package com.javaclaw.agent.tools;
 
+import org.springframework.stereotype.Component;
+
 import java.util.HashMap;
 import java.util.Map;
 
 /**
  * 天气查询工具：返回模拟的天气数据
  */
+@Component
 public class WeatherTool extends BaseTool {
 
     @Override

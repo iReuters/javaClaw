@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>JavaClaw AI 助手</title>
     <style>
+        /* 样式保持不变 */
         :root {
             --primary-color: #4361ee;
             --secondary-color: #3a0ca3;
@@ -466,6 +467,38 @@
             background: #64748b;
         }
         
+        .debug-panel {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            z-index: 1000;
+            max-height: 200px;
+            overflow-y: auto;
+            width: 300px;
+            display: none;
+        }
+        
+        .debug-toggle {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: var(--error-color);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            cursor: pointer;
+            z-index: 1001;
+            font-size: 20px;
+        }
+        
         @media (max-width: 768px) {
             .container {
                 padding: 10px;
@@ -495,6 +528,12 @@
             .message {
                 max-width: 95%;
             }
+            
+            .debug-panel {
+                width: 250px;
+                right: 10px;
+                bottom: 10px;
+            }
         }
     </style>
 </head>
@@ -515,6 +554,10 @@
                 <button class="new-session-btn" id="new-session-btn">
                     <span>➕</span>
                     <span>新会话</span>
+                </button>
+                <button class="control-btn" id="clear-storage-btn" title="清理损坏的本地存储">
+                    <span>🧹</span>
+                    <span>清理缓存</span>
                 </button>
             </div>
         </header>
@@ -597,58 +640,214 @@
         </div>
     </div>
     
+    <!-- 调试面板 -->
+    <button class="debug-toggle" id="debug-toggle">🐛</button>
+    <div class="debug-panel" id="debug-panel">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+            <strong>调试面板</strong>
+            <button onclick="document.getElementById('debug-panel').style.display='none'" style="background:none; border:none; color:white; cursor:pointer">✕</button>
+        </div>
+        <div id="debug-log"></div>
+    </div>
+    
     <script>
-        // DOM 元素
-        const chatMessages = document.getElementById('chat-messages');
-        const messageInput = document.getElementById('message-input');
-        const sendButton = document.getElementById('send-button');
-        const streamIndicator = document.getElementById('stream-indicator');
-        const emptyState = document.getElementById('empty-state');
-        const newSessionBtn = document.getElementById('new-session-btn');
-        const clearBtn = document.getElementById('clear-btn');
-        const exportBtn = document.getElementById('export-btn');
-        const streamToggle = document.getElementById('stream-toggle');
-        const sessionList = document.getElementById('session-list');
-        const currentSessionSpan = document.getElementById('current-session');
+        // 调试工具
+        const DEBUG = true;
+        const debugLog = [];
         
-        // 应用状态
-        let isStreaming = false;
-        let currentSession = 'web:direct';
-        let sessions = {
-            'web:direct': {
-                id: 'web:direct',
-                name: '当前会话',
-                messages: [],
-                lastActive: new Date()
+        function logDebug(...args) {
+            if (DEBUG) {
+                const timestamp = new Date().toLocaleTimeString();
+                const message = `[${timestamp}] ${args.join(' ')}`;
+                debugLog.push(message);
+                console.log(...args);
+                
+                // 更新调试面板
+                const debugPanel = document.getElementById('debug-log');
+                if (debugPanel) {
+                    debugPanel.innerHTML = debugLog.slice(-20).join('<br>');
+                    debugPanel.scrollTop = debugPanel.scrollHeight;
+                }
             }
-        };
-        let streamEnabled = true;
+        }
         
-        // 固定API地址 - 根据文档内容设置为localhost:8080
-        const API_BASE_URL = 'http://localhost:8080';
-        const CHAT_ENDPOINT = '/api/chat';
-        const STREAM_ENDPOINT = '/api/chat/stream';
+        // 安全初始化函数
+        function safeInit() {
+            try {
+                logDebug('开始安全初始化...');
+                
+                // 1. 先清理可能损坏的本地存储
+                cleanupCorruptedStorage();
+                
+                // 2. 初始化全局变量
+                initGlobals();
+                
+                // 3. 加载数据
+                loadSessionsFromStorage();
+                
+                // 4. 渲染UI
+                renderSessionList();
+                
+                // 5. 绑定事件
+                bindEvents();
+                
+                // 6. 检查URL参数
+                checkUrlParams();
+                
+                logDebug('安全初始化完成');
+                
+            } catch (error) {
+                console.error('初始化失败:', error);
+                logDebug('初始化错误:', error.message);
+                
+                // 显示错误信息
+                showError('页面初始化失败，正在尝试恢复...');
+                
+                // 尝试恢复
+                setTimeout(() => {
+                    try {
+                        localStorage.removeItem('javaclaw_sessions');
+                        location.reload();
+                    } catch (e) {
+                        location.reload();
+                    }
+                }, 2000);
+            }
+        }
         
-        // 初始化
-        function init() {
-            loadSessionsFromStorage();
-            renderSessionList();
+        // 清理损坏的本地存储
+        function cleanupCorruptedStorage() {
+            try {
+                const saved = localStorage.getItem('javaclaw_sessions');
+                if (saved) {
+                    // 尝试解析
+                    JSON.parse(saved);
+                    logDebug('本地存储数据检查通过');
+                } else {
+                    logDebug('无本地存储数据');
+                }
+            } catch (error) {
+                logDebug('本地存储数据损坏，正在清理...');
+                try {
+                    localStorage.removeItem('javaclaw_sessions');
+                    logDebug('损坏的本地存储已清理');
+                } catch (e) {
+                    logDebug('清理本地存储失败:', e.message);
+                }
+            }
+        }
+        
+        // 初始化全局变量
+        function initGlobals() {
+            // 使用window属性确保全局访问
+            window.chatMessages = document.getElementById('chat-messages');
+            window.messageInput = document.getElementById('message-input');
+            window.sendButton = document.getElementById('send-button');
+            window.streamIndicator = document.getElementById('stream-indicator');
+            window.emptyState = document.getElementById('empty-state');
+            window.newSessionBtn = document.getElementById('new-session-btn');
+            window.clearBtn = document.getElementById('clear-btn');
+            window.exportBtn = document.getElementById('export-btn');
+            window.streamToggle = document.getElementById('stream-toggle');
+            window.sessionList = document.getElementById('session-list');
+            window.currentSessionSpan = document.getElementById('current-session');
+            window.clearStorageBtn = document.getElementById('clear-storage-btn');
             
-            // 设置文本区域自动调整高度
-            messageInput.addEventListener('input', function() {
-                this.style.height = 'auto';
-                this.style.height = (this.scrollHeight) + 'px';
+            // 检查所有必要的DOM元素
+            const requiredElements = [
+                'chatMessages', 'messageInput', 'sendButton', 'sessionList',
+                'currentSessionSpan', 'newSessionBtn', 'clearBtn'
+            ];
+            
+            requiredElements.forEach(elementName => {
+                if (!window[elementName]) {
+                    throw new Error(`找不到必要的DOM元素: ${elementName}`);
+                }
             });
             
-            // 绑定事件
-            sendButton.addEventListener('click', sendMessage);
-            messageInput.addEventListener('keydown', handleKeyDown);
-            newSessionBtn.addEventListener('click', createNewSession);
-            clearBtn.addEventListener('click', clearCurrentChat);
-            exportBtn.addEventListener('click', exportChat);
-            streamToggle.addEventListener('click', toggleStreaming);
+            logDebug('全局变量初始化完成');
             
-            // 从URL获取sessionKey
+            // 应用状态
+            window.isStreaming = false;
+            window.currentSession = 'web:direct';
+            window.sessions = {
+                'web:direct': {
+                    id: 'web:direct',
+                    name: '当前会话',
+                    messages: [],
+                    lastActive: new Date()
+                }
+            };
+            window.streamEnabled = true;
+            
+            // API地址
+            window.API_BASE_URL = 'http://localhost:8080';
+            window.CHAT_ENDPOINT = '/api/chat';
+            window.STREAM_ENDPOINT = '/api/chat/stream';
+        }
+        
+        // 显示错误信息
+        function showError(message) {
+            const errorDiv = document.createElement('div');
+            errorDiv.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: var(--error-color);
+                color: white;
+                padding: 15px 20px;
+                border-radius: 8px;
+                z-index: 10000;
+                max-width: 400px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            `;
+            errorDiv.innerHTML = `
+                <strong>错误</strong>
+                <p style="margin: 5px 0 0 0; font-size: 14px;">${message}</p>
+            `;
+            document.body.appendChild(errorDiv);
+            
+            setTimeout(() => {
+                if (errorDiv.parentNode) {
+                    errorDiv.parentNode.removeChild(errorDiv);
+                }
+            }, 5000);
+        }
+        
+        // 绑定事件
+        function bindEvents() {
+            try {
+                // 设置文本区域自动调整高度
+                messageInput.addEventListener('input', function() {
+                    this.style.height = 'auto';
+                    this.style.height = (this.scrollHeight) + 'px';
+                });
+                
+                // 绑定按钮事件
+                sendButton.addEventListener('click', sendMessage);
+                messageInput.addEventListener('keydown', handleKeyDown);
+                newSessionBtn.addEventListener('click', createNewSession);
+                clearBtn.addEventListener('click', clearCurrentChat);
+                exportBtn.addEventListener('click', exportChat);
+                streamToggle.addEventListener('click', toggleStreaming);
+                clearStorageBtn.addEventListener('click', clearAllStorage);
+                
+                // 调试面板
+                document.getElementById('debug-toggle').addEventListener('click', function() {
+                    const panel = document.getElementById('debug-panel');
+                    panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
+                });
+                
+                logDebug('事件绑定完成');
+                
+            } catch (error) {
+                logDebug('事件绑定失败:', error.message);
+                throw error;
+            }
+        }
+        
+        // 检查URL参数
+        function checkUrlParams() {
             const urlParams = new URLSearchParams(window.location.search);
             const sessionFromUrl = urlParams.get('session');
             if (sessionFromUrl && sessionFromUrl !== currentSession) {
@@ -656,10 +855,38 @@
             }
         }
         
+        // 清理所有存储
+        function clearAllStorage() {
+            if (confirm('确定要清理所有本地缓存数据吗？这将清除所有会话历史。')) {
+                try {
+                    localStorage.removeItem('javaclaw_sessions');
+                    sessions = {
+                        'web:direct': {
+                            id: 'web:direct',
+                            name: '当前会话',
+                            messages: [],
+                            lastActive: new Date()
+                        }
+                    };
+                    currentSession = 'web:direct';
+                    
+                    // 重新渲染
+                    renderSessionList();
+                    switchSession('web:direct');
+                    
+                    showError('缓存已清理');
+                    logDebug('所有本地存储已清理');
+                } catch (error) {
+                    showError('清理失败: ' + error.message);
+                }
+            }
+        }
+        
         // 处理键盘事件
         function handleKeyDown(e) {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
+                logDebug('按下Enter键，发送消息');
                 sendMessage();
             }
         }
@@ -667,55 +894,64 @@
         // 发送消息
         function sendMessage() {
             const message = messageInput.value.trim();
-            if (!message || isStreaming) return;
+            logDebug('尝试发送消息:', message.substring(0, 50));
+            
+            if (!message) {
+                logDebug('消息为空，不发送');
+                return;
+            }
+            
+            if (isStreaming) {
+                logDebug('正在流式响应中，忽略发送');
+                return;
+            }
             
             // 隐藏空状态
             if (emptyState.style.display !== 'none') {
                 emptyState.style.display = 'none';
             }
             
-            // 添加用户消息到聊天窗口
+            // 添加用户消息
             addMessage(message, 'user');
             messageInput.value = '';
             messageInput.style.height = 'auto';
             
-            // 添加到会话历史
+            // 保存到会话
             addMessageToSession(currentSession, message, 'user');
             
-            // 如果流式响应开启
+            // 发送请求
             if (streamEnabled) {
-                // 显示流式响应中
                 streamIndicator.style.display = 'flex';
                 isStreaming = true;
                 sendButton.disabled = true;
-                
-                // 调用流式接口
                 fetchStreamResponse(message);
             } else {
-                // 非流式响应
                 addTypingIndicator();
                 fetchNonStreamResponse(message);
             }
         }
         
         // 获取流式响应
-        function fetchStreamResponse(message) {
+        async function fetchStreamResponse(message) {
             const apiUrl = API_BASE_URL + STREAM_ENDPOINT;
             const requestBody = {
                 message: message,
                 sessionKey: currentSession
             };
             
-            fetch(apiUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(requestBody)
-            })
-            .then(response => {
+            logDebug('发送流式请求到:', apiUrl);
+            
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+                
                 if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                    throw new Error(`HTTP错误: ${response.status}`);
                 }
                 
                 const reader = response.body.getReader();
@@ -724,126 +960,95 @@
                 let messageElement = null;
                 let buffer = '';
                 
-                // 读取流式响应
-                function readStream() {
-                    reader.read().then(({ done, value }) => {
-                        if (done) {
-                            // 响应结束
-                            isStreaming = false;
-                            sendButton.disabled = false;
-                            streamIndicator.style.display = 'none';
-                            
-                            // 保存完整消息到会话历史
-                            if (botMessage.trim()) {
-                                addMessageToSession(currentSession, botMessage, 'bot');
-                            }
-                            return;
-                        }
-                        
-                        // 解码响应数据
-                        const chunk = decoder.decode(value, { stream: true });
-                        buffer += chunk;
-                        
-                        // 按行分割处理 SSE
-                        const lines = buffer.split('\n');
-                        buffer = lines.pop() || ''; // 保存不完整的行
-                        
-                        // 处理每一行
-                        lines.forEach(line => {
-                            // 跳过空行
-                            if (line.trim() === '') return;
-                            
-                            // 处理 data: 行
-                            if (line.startsWith('data:')) {
-                                const data = line.substring(5).trim();
-                                
-                                // 检查是否是完成事件
-                                if (data === '[DONE]') {
-                                    return;
-                                }
-                                
-                                // 累积消息
-                                botMessage += data;
-                                
-                                // 如果是第一次收到数据，创建消息元素
-                                if (!messageElement) {
-                                    messageElement = createMessageElement('', 'bot');
-                                }
-                                
-                                // 更新消息内容，支持代码高亮
-                                updateMessageWithContent(messageElement, botMessage);
-                                
-                                // 自动滚动到底部
-                                scrollToBottom();
-                            }
-                        });
-                        
-                        // 继续读取
-                        readStream();
-                    }).catch(error => {
-                        console.error('Error reading stream:', error);
+                while (true) {
+                    const { done, value } = await reader.read();
+                    
+                    if (done) {
                         isStreaming = false;
                         sendButton.disabled = false;
                         streamIndicator.style.display = 'none';
-                        addMessage('抱歉，流式响应过程中发生了错误。', 'bot');
+                        
+                        if (botMessage.trim()) {
+                            addMessageToSession(currentSession, botMessage, 'bot');
+                        }
+                        logDebug('流式响应完成');
+                        break;
+                    }
+                    
+                    const chunk = decoder.decode(value, { stream: true });
+                    buffer += chunk;
+                    
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || '';
+                    
+                    lines.forEach(line => {
+                        if (line.trim() === '') return;
+                        
+                        if (line.startsWith('data:')) {
+                            const data = line.substring(5).trim();
+                            
+                            if (data === '[DONE]') {
+                                return;
+                            }
+                            
+                            botMessage += data;
+                            
+                            if (!messageElement) {
+                                messageElement = createMessageElement('', 'bot');
+                            }
+                            
+                            updateMessageWithContent(messageElement, botMessage);
+                            scrollToBottom();
+                        }
                     });
                 }
                 
-                readStream();
-            })
-            .catch(error => {
-                console.error('Error:', error);
+            } catch (error) {
+                console.error('流式请求错误:', error);
                 isStreaming = false;
                 sendButton.disabled = false;
                 streamIndicator.style.display = 'none';
-                addMessage('抱歉，请求过程中发生了错误。请检查后端服务是否正常运行。', 'bot');
-            });
+                addMessage('请求失败: ' + error.message, 'bot');
+                logDebug('流式请求失败:', error.message);
+            }
         }
         
         // 获取非流式响应
-        function fetchNonStreamResponse(message) {
+        async function fetchNonStreamResponse(message) {
             const apiUrl = API_BASE_URL + CHAT_ENDPOINT;
             const requestBody = {
                 message: message,
                 sessionKey: currentSession
             };
             
-            fetch(apiUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(requestBody)
-            })
-            .then(response => {
+            logDebug('发送非流式请求到:', apiUrl);
+            
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+                
                 if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(data => {
-                // 移除打字指示器
-                const typingIndicator = document.querySelector('.typing-indicator');
-                if (typingIndicator) {
-                    typingIndicator.remove();
+                    throw new Error(`HTTP错误: ${response.status}`);
                 }
                 
-                // 假设响应中有一个content字段包含消息
+                const data = await response.json();
+                removeTypingIndicator();
+                
                 const responseMessage = data.content || JSON.stringify(data, null, 2);
                 addMessage(responseMessage, 'bot');
-                
-                // 保存到会话历史
                 addMessageToSession(currentSession, responseMessage, 'bot');
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                // 移除打字指示器
-                const typingIndicator = document.querySelector('.typing-indicator');
-                if (typingIndicator) {
-                    typingIndicator.remove();
-                }
-                addMessage('抱歉，请求过程中发生了错误。', 'bot');
-            });
+                
+            } catch (error) {
+                console.error('非流式请求错误:', error);
+                removeTypingIndicator();
+                addMessage('请求失败: ' + error.message, 'bot');
+                logDebug('非流式请求失败:', error.message);
+            }
         }
         
         // 添加打字指示器
@@ -859,6 +1064,14 @@
             scrollToBottom();
         }
         
+        // 移除打字指示器
+        function removeTypingIndicator() {
+            const typingIndicator = document.querySelector('.typing-indicator');
+            if (typingIndicator) {
+                typingIndicator.remove();
+            }
+        }
+        
         // 创建消息元素
         function createMessageElement(content, type) {
             const messageElement = document.createElement('div');
@@ -866,7 +1079,7 @@
             
             const avatar = document.createElement('div');
             avatar.className = `avatar ${type}-avatar`;
-            avatar.innerHTML = type === 'user' ? '<span>👤</span>' : '<span>🤖</span>';
+            avatar.innerHTML = type === 'user' ? '👤' : '🤖';
             
             const messageContent = document.createElement('div');
             messageContent.className = 'message-content';
@@ -889,57 +1102,44 @@
             return messageBubble;
         }
         
-        // 添加消息到聊天窗口
+        // 添加消息
         function addMessage(content, type) {
-            const messageBubble = createMessageElement(content, type);
-            
-            // 添加复制按钮到代码块
+            createMessageElement(content, type);
             addCopyButtons();
-            
-            // 滚动到底部
             scrollToBottom();
-            
-            // 保存到会话历史
-            if (type === 'user' || type === 'bot') {
-                addMessageToSession(currentSession, content, type);
-            }
         }
         
-        // 更新消息内容（用于流式响应）
+        // 更新消息内容
         function updateMessageWithContent(element, content) {
             element.innerHTML = formatMessageContent(content);
             addCopyButtons();
         }
         
-        // 格式化消息内容（支持代码高亮）
+        // 格式化消息内容
         function formatMessageContent(content) {
-            // 简单的代码块检测
             const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/g;
-            let formatted = content.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            let formatted = content
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
             
-            // 替换代码块
             formatted = formatted.replace(codeBlockRegex, (match, lang, code) => {
                 const language = lang || 'text';
                 return `<div class="code-block">
                     <div style="color: #94a3b8; font-size: 12px; margin-bottom: 8px;">${language}</div>
                     <pre>${code}</pre>
-                    <button class="copy-btn" onclick="copyCodeToClipboard(this)">复制代码</button>
                 </div>`;
             });
             
-            // 替换行内代码
             formatted = formatted.replace(/`([^`]+)`/g, '<code style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-family: monospace;">$1</code>');
-            
-            // 替换换行符
             formatted = formatted.replace(/\n/g, '<br>');
             
             return formatted;
         }
         
-        // 添加复制按钮到代码块
+        // 添加复制按钮
         function addCopyButtons() {
             document.querySelectorAll('.code-block').forEach(block => {
-                // 如果已经有复制按钮，跳过
                 if (block.querySelector('.copy-btn')) return;
                 
                 const copyBtn = document.createElement('button');
@@ -960,9 +1160,9 @@
         // 复制到剪贴板
         function copyToClipboard(text) {
             navigator.clipboard.writeText(text).then(() => {
-                console.log('代码已复制到剪贴板');
+                logDebug('代码已复制');
             }).catch(err => {
-                console.error('复制失败: ', err);
+                console.error('复制失败:', err);
             });
         }
         
@@ -992,25 +1192,19 @@
                 lastActive: new Date()
             };
             
-            // 切换到新会话
             switchSession(sessionId);
-            
-            // 更新会话列表
             renderSessionList();
-            
-            // 保存到本地存储
             saveSessionsToStorage();
+            logDebug('创建新会话:', sessionId);
         }
         
         // 切换会话
         function switchSession(sessionId) {
             if (!sessions[sessionId]) return;
             
-            // 更新当前会话
             currentSession = sessionId;
             currentSessionSpan.textContent = sessionId;
             
-            // 更新会话列表高亮
             document.querySelectorAll('.session-item').forEach(item => {
                 item.classList.remove('active');
                 if (item.dataset.session === sessionId) {
@@ -1018,10 +1212,8 @@
                 }
             });
             
-            // 清空当前聊天窗口
             chatMessages.innerHTML = '';
             
-            // 加载会话消息
             if (sessions[sessionId].messages.length === 0) {
                 emptyState.style.display = 'flex';
             } else {
@@ -1031,13 +1223,12 @@
                 });
             }
             
-            // 更新URL
             const url = new URL(window.location);
             url.searchParams.set('session', sessionId);
             window.history.pushState({}, '', url);
             
-            // 滚动到底部
             scrollToBottom();
+            logDebug('切换到会话:', sessionId);
         }
         
         // 添加消息到会话
@@ -1050,10 +1241,7 @@
                 });
                 sessions[sessionId].lastActive = new Date();
                 
-                // 更新会话列表
                 renderSessionList();
-                
-                // 保存到本地存储
                 saveSessionsToStorage();
             }
         }
@@ -1062,12 +1250,10 @@
         function renderSessionList() {
             sessionList.innerHTML = '';
             
-            // 排序会话（按最后活跃时间）
             const sortedSessions = Object.values(sessions).sort((a, b) => 
                 b.lastActive - a.lastActive
             );
             
-            // 渲染每个会话
             sortedSessions.forEach(session => {
                 const sessionItem = document.createElement('div');
                 sessionItem.className = `session-item ${session.id === currentSession ? 'active' : ''}`;
@@ -1114,6 +1300,7 @@
                 chatMessages.innerHTML = '';
                 emptyState.style.display = 'flex';
                 saveSessionsToStorage();
+                logDebug('清空当前对话');
             }
         }
         
@@ -1139,6 +1326,7 @@
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
+            logDebug('导出对话完成');
         }
         
         // 切换流式响应
@@ -1153,6 +1341,7 @@
                 streamToggle.querySelector('span:first-child').textContent = '🔌';
                 text.textContent = '流式响应: 关闭';
             }
+            logDebug('切换流式响应:', streamEnabled);
         }
         
         // 从本地存储加载会话
@@ -1161,27 +1350,99 @@
                 const saved = localStorage.getItem('javaclaw_sessions');
                 if (saved) {
                     const parsed = JSON.parse(saved);
-                    // 确保有默认会话
                     if (parsed['web:direct']) {
                         sessions = parsed;
+                        logDebug('从本地存储加载会话成功，数量:', Object.keys(sessions).length);
+                    } else {
+                        logDebug('本地存储数据格式不正确，使用默认');
                     }
+                } else {
+                    logDebug('无本地存储数据，使用默认会话');
                 }
-            } catch (e) {
-                console.error('加载会话失败:', e);
+            } catch (error) {
+                console.error('加载会话失败:', error);
+                logDebug('加载会话失败，使用默认:', error.message);
+                sessions = {
+                    'web:direct': {
+                        id: 'web:direct',
+                        name: '当前会话',
+                        messages: [],
+                        lastActive: new Date()
+                    }
+                };
+                
+                // 清理损坏的数据
+                try {
+                    localStorage.removeItem('javaclaw_sessions');
+                } catch (e) {
+                    // 忽略清理错误
+                }
             }
         }
         
         // 保存会话到本地存储
         function saveSessionsToStorage() {
             try {
-                localStorage.setItem('javaclaw_sessions', JSON.stringify(sessions));
-            } catch (e) {
-                console.error('保存会话失败:', e);
+                // 限制存储大小
+                const sortedSessions = Object.values(sessions)
+                    .sort((a, b) => b.lastActive - a.lastActive)
+                    .slice(0, 20);
+                
+                const sessionsToSave = {};
+                sortedSessions.forEach(session => {
+                    sessionsToSave[session.id] = session;
+                });
+                
+                localStorage.setItem('javaclaw_sessions', JSON.stringify(sessionsToSave));
+                logDebug('会话保存成功，数量:', Object.keys(sessionsToSave).length);
+            } catch (error) {
+                console.error('保存会话失败:', error);
+                logDebug('保存会话失败:', error.message);
             }
         }
         
         // 页面加载时初始化
-        document.addEventListener('DOMContentLoaded', init);
+        window.addEventListener('load', function() {
+            console.log('页面加载完成，开始安全初始化...');
+            safeInit();
+            
+            // 添加应急恢复按钮
+            if (!document.getElementById('emergency-reload')) {
+                const reloadBtn = document.createElement('button');
+                reloadBtn.id = 'emergency-reload';
+                reloadBtn.innerHTML = '🔄';
+                reloadBtn.title = '强制刷新页面';
+                reloadBtn.style.cssText = `
+                    position: fixed;
+                    bottom: 70px;
+                    right: 20px;
+                    background: var(--warning-color);
+                    color: white;
+                    border: none;
+                    border-radius: 50%;
+                    width: 40px;
+                    height: 40px;
+                    cursor: pointer;
+                    z-index: 1001;
+                    font-size: 20px;
+                `;
+                reloadBtn.onclick = function() {
+                    localStorage.removeItem('javaclaw_sessions');
+                    location.reload();
+                };
+                document.body.appendChild(reloadBtn);
+            }
+        });
+        
+        // 捕获未处理的错误
+        window.addEventListener('error', function(event) {
+            logDebug('未捕获的错误:', event.message, 'at', event.filename, ':', event.lineno);
+        });
+        
+        // 捕获未处理的Promise拒绝
+        window.addEventListener('unhandledrejection', function(event) {
+            logDebug('未处理的Promise拒绝:', event.reason);
+        });
     </script>
 </body>
 </html>

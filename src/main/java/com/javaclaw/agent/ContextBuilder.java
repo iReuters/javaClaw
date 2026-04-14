@@ -20,18 +20,15 @@ public class ContextBuilder {
     private static final String[] BOOTSTRAP_FILES = {"AGENTS.md", "SOUL.md", "USER.md", "TOOLS.md", "IDENTITY.md"};
 
     private final Path workspace;
-    private final MemoryStore memory;
     private final SkillsLoader skillsLoader;
 
     public ContextBuilder(Path workspace) {
         this.workspace = workspace;
-        this.memory = new MemoryStore(workspace);
         this.skillsLoader = new SkillsLoader(workspace, null);
     }
 
-    public ContextBuilder(Path workspace, Path builtinSkillsDir, MemoryStore memory, SkillsLoader skillsLoader) {
+    public ContextBuilder(Path workspace, Path builtinSkillsDir, SkillsLoader skillsLoader) {
         this.workspace = workspace;
-        this.memory = memory != null ? memory : new MemoryStore(workspace);
         this.skillsLoader = skillsLoader != null ? skillsLoader : new SkillsLoader(workspace, builtinSkillsDir);
     }
 
@@ -51,10 +48,7 @@ public class ContextBuilder {
                 }
             }
         }
-        String mem = memory.getMemoryContext();
-        if (mem != null && !mem.isEmpty()) {
-            sb.append(mem);
-        }
+
         if (skillNames != null && !skillNames.isEmpty()) {
             sb.append(skillsLoader.loadSkillsForContext(skillNames));
         }

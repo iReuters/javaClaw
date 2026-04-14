@@ -8,6 +8,7 @@ import java.util.Map;
 /**
  * 汇率查询工具：返回模拟的汇率数据
  */
+@Component
 public class ExchangeRateTool extends BaseTool {
 
     @Override
@@ -24,16 +25,20 @@ public class ExchangeRateTool extends BaseTool {
     public Map<String, Object> getParameters() {
         Map<String, Object> params = new HashMap<>();
         Map<String, Object> properties = new HashMap<>();
-        properties.put("type", "string");
-        properties.put("description", "源货币代码，例如 USD");
-        properties.put("required", true);
-        params.put("from_currency", properties);
         
-        properties = new HashMap<>();
-        properties.put("type", "string");
-        properties.put("description", "目标货币代码，例如 CNY");
-        properties.put("required", true);
-        params.put("to_currency", properties);
+        Map<String, Object> fromCurrencySchema = new HashMap<>();
+        fromCurrencySchema.put("type", "string");
+        fromCurrencySchema.put("description", "源货币代码，例如 USD");
+        properties.put("from_currency", fromCurrencySchema);
+        
+        Map<String, Object> toCurrencySchema = new HashMap<>();
+        toCurrencySchema.put("type", "string");
+        toCurrencySchema.put("description", "目标货币代码，例如 CNY");
+        properties.put("to_currency", toCurrencySchema);
+        
+        params.put("type", "object");
+        params.put("properties", properties);
+        params.put("required", new String[]{"from_currency", "to_currency"});
         
         return params;
     }

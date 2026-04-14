@@ -40,7 +40,6 @@ public class AgentLoop {
     private final SessionManager sessionManager;
     private final ToolRegistry toolRegistry;
     private final ContextBuilder contextBuilder;
-    private final MemoryStore memoryStore;
     private final SkillsLoader skillsLoader;
 
     private CronService cronService;
@@ -73,9 +72,8 @@ public class AgentLoop {
         this.sessionManager = sessionManager;
         this.cronService = cronService;
         this.mcpServers = mcpServers != null ? mcpServers : Collections.emptyMap();
-        this.memoryStore = new MemoryStore(this.workspace);
         this.skillsLoader = new SkillsLoader(this.workspace, null);
-        this.contextBuilder = new ContextBuilder(this.workspace, null, memoryStore, skillsLoader);
+        this.contextBuilder = new ContextBuilder(this.workspace, null, skillsLoader);
         this.toolRegistry = toolRegistry;
     }
 
@@ -117,12 +115,7 @@ public class AgentLoop {
             return out;
         }
 
-        if (session.getMessages().size() > memoryWindow) {
-            Session s = session;
-            java.util.concurrent.ExecutorService exec = java.util.concurrent.Executors.newSingleThreadExecutor();
-            exec.submit(() -> consolidateMemory(s, false));
-            exec.shutdown();
-        }
+
 
         Map<String, Object> requestContext = new HashMap<>();
         requestContext.put("channel", channel);
@@ -240,55 +233,7 @@ public class AgentLoop {
         // no-op for now
     }
 
-    /** 记忆合并：将会话片段压缩进 MEMORY.md / HISTORY.md */
-    public void consolidateMemory(Session session, boolean archiveAll) {
-        if (session == null) {
-            return;
-        }
-        MemoryStore mem = new MemoryStore(workspace);
-        String existing = mem.readLongTerm();
-        StringBuilder toMerge = new StringBuilder();
-        for (Map<String, Object> m : session.getHistory(memoryWindow * 2)) {
-            Object role = m.get("role");
-            Object content = m.get("content");
-            if (role != null && content != null) {
-                toMerge.append(role).append(": ").append(content).append("\n");
-            }
-        }
-        List<Map<String, Object>> messages = new ArrayList<>();
-        Map<String, Object> sys = new HashMap<>();
-        sys.put("role", "system");
-        sys.put("content", "You are a memory consolidation assistant. Reply with JSON only: {\"historyEntry\": \"...\", \"memoryUpdate\": \"...\"}");
-        messages.add(sys);
-        Map<String, Object> u = new HashMap<>();
-        u.put("role", "user");
-        u.put("content", "Summarize the following conversation into a brief memory update.\n\nCurrent memory:\n" + existing + "\n\nConversation:\n" + toMerge);
-        messages.add(u);
-        com.javaclaw.providers.LLMResponse response = provider.chat(messages, Collections.<Map<String, Object>>emptyList(), model, 1024, 0.3);
-        String text = response.getContent();
-        if (text != null && text.trim().startsWith("{")) {
-            try {
-                @SuppressWarnings("unchecked")
-                Map<String, Object> parsed = MAPPER.readValue(text, Map.class);
-                Object he = parsed.get("historyEntry");
-                Object mu = parsed.get("memoryUpdate");
-                if (he != null) {
-                    mem.appendHistory(he.toString());
-                }
-                if (mu != null) {
-                    mem.writeLongTerm(existing + "\n" + mu.toString());
-                }
-            } catch (Exception e) {
-                mem.appendHistory("consolidate failed: " + text);
-            }
-        }
-        if (archiveAll) {
-            session.clear();
-        } else {
-            session.setLastConsolidated(java.time.Instant.now());
-        }
-        sessionManager.save(session);
-    }
+
 
     public ToolRegistry getToolRegistry() {
         return toolRegistry;
