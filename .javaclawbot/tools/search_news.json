@@ -1,0 +1,15 @@
+{
+    "name": "search_news",
+    "description": "根据关键词搜索新闻",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "keyword": {
+                "type": "string",
+                "description": "搜索关键词"
+            }
+        },
+        "required": ["keyword"]
+    },
+    "response": "【%keyword% 相关新闻】\n1. %keyword% 技术取得突破性进展，行业应用加速落地\n2. %keyword% 领域投资热潮持续，资本加速布局\n3. %keyword% 成为年度最受关注话题之一\n4. 专家解读：%keyword% 将深刻改变未来生活方式"
+}

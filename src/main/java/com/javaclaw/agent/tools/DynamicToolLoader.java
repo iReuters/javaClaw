@@ -51,8 +51,9 @@ public class DynamicToolLoader {
         this.jsonMapper = new ObjectMapper();
     }
 
-    public DynamicToolLoader(Path workspace) {
+    public DynamicToolLoader(Path workspace, ApplicationContext applicationContext) {
         this.workspace = workspace;
+        this.applicationContext = applicationContext;
         this.jsonMapper = new ObjectMapper();
     }
 
@@ -417,6 +418,9 @@ public class DynamicToolLoader {
             return "[Error: dynamic tool not found: " + name + "]";
         }
 
+        log.info("executeDynamicTool: name={}, type='{}', beanName='{}', method='{}', hasValidBeanConfig={}, params={}",
+                tool.getName(), tool.getType(), tool.getBeanName(), tool.getMethod(), tool.hasValidBeanConfig(), params);
+
         List<String> errors = tool.validateParams(params);
         if (!errors.isEmpty()) {
             return "[Error: invalid params: " + String.join("; ", errors) + "]";
@@ -425,13 +429,16 @@ public class DynamicToolLoader {
         try {
             // 如果是Bean调用，执行Spring Bean方法
             if (tool.hasValidBeanConfig()) {
+                log.info("Executing as bean call");
                 return executeBeanMethod(tool, params);
             }
 
+            log.info("Executing as static template (responseTemplate='{}')", tool.getResponseTemplate());
             // 否则执行静态模板
             String response = tool.execute(params);
             return resolveResponseTemplate(response, params);
         } catch (Exception e) {
+            log.error("Error executing dynamic tool", e);
             return "[Error: " + e.getMessage() + "]";
         }
     }
@@ -440,11 +447,18 @@ public class DynamicToolLoader {
      * 执行Spring Bean方法
      */
     private String executeBeanMethod(DynamicTool tool, Map<String, Object> params) throws Exception {
+        if (applicationContext == null) {
+            throw new RuntimeException("ApplicationContext is null - Spring injection failed");
+        }
+
         String beanName = tool.getBeanName();
         String methodName = tool.getMethod();
 
+        log.info("executeBeanMethod: beanName={}, methodName={}, params={}", beanName, methodName, params);
+
         // 从ApplicationContext获取Bean
         Object bean = applicationContext.getBean(beanName);
+        log.info("Got bean: {}", bean.getClass().getName());
 
         // 查找匹配的方法
         Class<?> beanClass = bean.getClass();
@@ -453,12 +467,15 @@ public class DynamicToolLoader {
         if (method == null) {
             throw new RuntimeException("Method '" + methodName + "' not found in bean '" + beanName + "' with compatible parameters");
         }
+        log.info("Found method: {} with {} params", method.getName(), method.getParameterTypes().length);
 
         // 准备方法参数
         Object[] args = prepareMethodArgs(method, params);
+        log.info("Prepared args length: {}", args.length);
 
         // 调用方法
         Object result = method.invoke(bean, args);
+        log.info("Method result: {}", result);
 
         // 处理返回值
         if (result == null) {
@@ -491,6 +508,7 @@ public class DynamicToolLoader {
 
     /**
      * 检查方法是否与参数兼容
+     * 注意：只检查方法参数类型与传入参数的类型兼容性，不检查数量
      */
     private boolean isMethodCompatible(Method method, Map<String, Object> params) {
         Class<?>[] paramTypes = method.getParameterTypes();
@@ -501,12 +519,23 @@ public class DynamicToolLoader {
             return paramTypes.length == 0;
         }
 
-        // 如果参数数量不匹配，排除varargs情况
+        // 单参数方法：检查参数类型是否兼容
+        if (paramTypes.length == 1) {
+            Class<?> paramType = paramTypes[0];
+            // 对于单参数方法，只要有一个匹配的参数值就认为兼容
+            for (Object value : params.values()) {
+                if (value == null || isAssignable(paramType, value.getClass())) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // 多参数方法：检查类型兼容性
         if (!method.isVarArgs() && paramTypes.length != params.size()) {
             return false;
         }
 
-        // 检查每个参数类型
         int i = 0;
         for (Map.Entry<String, Object> entry : params.entrySet()) {
             if (i >= paramTypes.length) {
@@ -516,12 +545,10 @@ public class DynamicToolLoader {
             Object value = entry.getValue();
 
             if (value == null) {
-                // null值可以赋值给任何引用类型
                 i++;
                 continue;
             }
 
-            // 检查类型兼容性
             if (!isAssignable(paramType, value.getClass())) {
                 return false;
             }
@@ -568,8 +595,19 @@ public class DynamicToolLoader {
                 Object value = params.get(paramNames[i]);
                 args[i] = convertValue(value, paramTypes[i]);
             }
+        } else if (paramTypes.length == 1) {
+            // 单参数方法：从params中找到第一个兼容的值
+            for (Object value : params.values()) {
+                if (isAssignable(paramTypes[0], value != null ? value.getClass() : Object.class)) {
+                    args[0] = convertValue(value, paramTypes[0]);
+                    return args;
+                }
+            }
+            // 如果没找到兼容的值，尝试取symbol参数
+            Object symbolValue = params.get("symbol");
+            args[0] = convertValue(symbolValue, paramTypes[0]);
         } else {
-            // 否则按 Map 迭代顺序（假设与参数顺序一致）
+            // 多参数方法：按Map迭代顺序（不推荐，顺序不可靠）
             int i = 0;
             for (Object value : params.values()) {
                 if (i >= paramTypes.length) break;
@@ -595,8 +633,6 @@ public class DynamicToolLoader {
         } catch (Exception e) {
             return null;
         }
-    }
-        return args;
     }
 
     /**

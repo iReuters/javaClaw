@@ -29,7 +29,7 @@ public class ToolRegistry {
         for (Tool tool : toolBeans) {
             register(tool);
         }
-        log.info("Tools initialized (beans): {}", toolBeans.size());
+        log.info("Tools initialized (beans): {}, names={}", toolBeans.size(), getToolNames());
     }
 
     public void register(Tool tool) {

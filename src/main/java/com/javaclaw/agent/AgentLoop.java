@@ -228,16 +228,21 @@ public class AgentLoop {
         return new RunResult("[Max tool iterations reached]", toolsUsed);
     }
 
-    /** 执行工具（优先 Bean 工具，再动态工具） */
+    /** 执行工具（动态工具优先，Bean 工具兜底） */
     private String executeTool(String name, Map<String, Object> params) {
-        // 先尝试 Bean 工具
-        if (toolRegistry.has(name)) {
-            return toolRegistry.execute(name, params);
-        }
-        // 再尝试动态工具
+        log.info("executeTool called: name={}, params={}", name, params);
+
+        // 优先尝试动态工具
         if (dynamicToolLoader != null && dynamicToolLoader.getDynamicTool(name) != null) {
+            log.info("  -> Executing via dynamicToolLoader");
             return dynamicToolLoader.executeDynamicTool(name, params);
         }
+        // 再尝试 Bean 工具
+        if (toolRegistry.has(name)) {
+            log.info("  -> Executing via toolRegistry");
+            return toolRegistry.execute(name, params);
+        }
+        log.warn("  -> Tool not found: {}", name);
         return "[Error: tool not found: " + name + "]";
     }
 

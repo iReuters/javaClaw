@@ -15,6 +15,9 @@ javaclaw:
         - get_weather
         - get_server_time
         - calculate
+      news-skill:
+        - get_latest_news
+        - search_news
     # 全局默认工具，所有 skill 都会加载
     default:
       - get_weather
