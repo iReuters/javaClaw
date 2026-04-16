@@ -97,6 +97,15 @@ public class AgentLoop {
      * 同上；streamConsumer 非 null 时，将 LLM 的 content 增量回调（流式输出）。仅最后一轮纯文本回复会流式。
      */
     public OutboundMessage processMessage(InboundMessage msg, String sessionKeyOverride, Consumer<String> streamConsumer) {
+        return processMessage(msg, sessionKeyOverride, streamConsumer, null);
+    }
+
+    /**
+     * 带步骤回调的 processMessage，用于 SSE 流式输出步骤
+     * @param streamConsumer 内容块回调（已废弃，仅保留兼容性）
+     * @param stepCallback 步骤回调，每完成一个步骤触发
+     */
+    public OutboundMessage processMessage(InboundMessage msg, String sessionKeyOverride, Consumer<String> streamConsumer, Consumer<AgentStep> stepCallback) {
         String sessionKey = sessionKeyOverride != null ? sessionKeyOverride : msg.getSessionKey();
         String channel = msg.getChannel();
         String chatId = msg.getChatId();
@@ -122,8 +131,6 @@ public class AgentLoop {
             return out;
         }
 
-
-
         Map<String, Object> requestContext = new HashMap<>();
         requestContext.put("channel", channel);
         requestContext.put("chatId", chatId);
@@ -134,7 +141,7 @@ public class AgentLoop {
                 history, content, skillNames, msg.getMedia(), channel, chatId);
         // 传入 skillName 用于工具过滤（取第一个 skill）
         String activeSkill = (skillNames != null && !skillNames.isEmpty()) ? skillNames.get(0) : null;
-        RunResult result = runAgentLoop(initialMessages, streamConsumer, requestContext, activeSkill);
+        RunResult result = runAgentLoop(initialMessages, streamConsumer, requestContext, activeSkill, stepCallback);
         session.addMessage("user", content, null);
         session.addMessage("assistant", result.getContent(), null);
         sessionManager.save(session);
@@ -164,8 +171,17 @@ public class AgentLoop {
      * 带 skill 名称的 runAgentLoop，用于过滤工具定义
      */
     public RunResult runAgentLoop(List<Map<String, Object>> initialMessages, Consumer<String> streamConsumer, Map<String, Object> requestContext, String skillName) {
+        return runAgentLoop(initialMessages, streamConsumer, requestContext, skillName, null);
+    }
+
+    /**
+     * 带 skill 名称和步骤回调的 runAgentLoop
+     * @param stepCallback 每完成一个步骤回调一次，用于 SSE 流式输出步骤
+     */
+    public RunResult runAgentLoop(List<Map<String, Object>> initialMessages, Consumer<String> streamConsumer, Map<String, Object> requestContext, String skillName, Consumer<AgentStep> stepCallback) {
         List<Map<String, Object>> messages = new ArrayList<>(initialMessages);
         List<String> toolsUsed = new ArrayList<>();
+        List<AgentStep> steps = new ArrayList<>();
         int iter = 0;
 
         // 加载所有工具定义（Bean 工具 + 动态工具）
@@ -176,6 +192,7 @@ public class AgentLoop {
 
         while (iter < maxIterations) {
             iter++;
+            AgentStep step = new AgentStep(iter, "tool_call");
             com.javaclaw.providers.LLMResponse response = provider.chat(
                     messages,
                     toolDefs,
@@ -183,6 +200,10 @@ public class AgentLoop {
                     maxTokens,
                     temperature,
                     streamConsumer);
+
+            // 设置思考内容
+            step.setReasoning(response.getReasoningContent());
+
             if (response.hasToolCalls()) {
                 List<Map<String, Object>> toolCallsForMessage = new ArrayList<>();
                 for (ToolCallRequest tc : response.getToolCalls()) {
@@ -198,11 +219,21 @@ public class AgentLoop {
                     }
                     fn.put("function", f);
                     toolCallsForMessage.add(fn);
+
+                    // 添加工具调用到步骤
+                    step.addToolCall(tc.getId(), tc.getName(), tc.getArguments() != null ? tc.getArguments().toString() : "{}");
                 }
+
+                // 设置回复内容（可能是空或简短总结）
+                step.setContent(response.getContent());
+                step.setType("tool_call");
+
                 contextBuilder.addAssistantMessage(messages,
                         response.getContent(),
                         toolCallsForMessage,
                         response.getReasoningContent());
+
+                // 执行工具调用并记录结果
                 for (ToolCallRequest tc : response.getToolCalls()) {
                     Map<String, Object> params = new HashMap<>(tc.getArguments() != null ? tc.getArguments() : Collections.<String, Object>emptyMap());
                     if (requestContext != null) {
@@ -210,18 +241,44 @@ public class AgentLoop {
                     }
                     String result = executeTool(tc.getName(), params);
                     toolsUsed.add(tc.getName());
+                    step.addToolResult(tc.getName(), result);
                     contextBuilder.addToolResult(messages, tc.getId(), tc.getName(), result);
                 }
+
+                // 回调步骤
+                if (stepCallback != null) {
+                    stepCallback.accept(step);
+                }
+                steps.add(step);
+
                 Map<String, Object> userReflect = new HashMap<>();
                 userReflect.put("role", "user");
                 userReflect.put("content", REFLECT_USER_MSG);
                 messages.add(userReflect);
             } else {
-                String finalContent = response.getContent() != null ? response.getContent() : "";
-                return new RunResult(finalContent, toolsUsed);
+                // 最终回复步骤
+                step.setType("final");
+                step.setContent(response.getContent() != null ? response.getContent() : "");
+                step.setReasoning(response.getReasoningContent());
+
+                if (stepCallback != null) {
+                    stepCallback.accept(step);
+                }
+                steps.add(step);
+
+                return new RunResult(response.getContent(), toolsUsed, steps);
             }
         }
-        return new RunResult("[Max tool iterations reached]", toolsUsed);
+
+        // 达到最大迭代次数
+        AgentStep maxIterStep = new AgentStep(iter, "max_iterations");
+        maxIterStep.setContent("[Max tool iterations reached]");
+        if (stepCallback != null) {
+            stepCallback.accept(maxIterStep);
+        }
+        steps.add(maxIterStep);
+
+        return new RunResult("[Max tool iterations reached]", toolsUsed, steps);
     }
 
     /** 执行工具（动态工具优先，Bean 工具兜底） */
