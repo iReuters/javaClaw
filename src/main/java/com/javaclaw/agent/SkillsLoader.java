@@ -2,7 +2,8 @@ package com.javaclaw.agent;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.javaclaw.dao.SkillDao;
+import com.javaclaw.entity.SkillRecord;
+import com.javaclaw.mapper.SkillMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -18,22 +19,39 @@ import java.util.*;
 @Slf4j
 public class SkillsLoader {
 
-    private final SkillDao skillDao;
+    private final SkillMapper skillMapper;
 
     private final Path workspace;
     private final Path builtinSkillsDir;
 
+    private final ObjectMapper jsonMapper = new ObjectMapper();
+
     @Autowired
-    public SkillsLoader(SkillDao skillDao) {
-        this.skillDao = skillDao;
+    public SkillsLoader(SkillMapper skillMapper) {
+        this.skillMapper = skillMapper;
         this.workspace = Paths.get(".javaclawbot");
         this.builtinSkillsDir = null;
     }
 
-    public SkillsLoader(SkillDao skillDao, Path workspace, Path builtinSkillsDir) {
-        this.skillDao = skillDao;
+    public SkillsLoader(SkillMapper skillMapper, Path workspace, Path builtinSkillsDir) {
+        this.skillMapper = skillMapper;
         this.workspace = workspace;
         this.builtinSkillsDir = builtinSkillsDir;
+    }
+
+    /**
+     * 解析tools JSON字段
+     */
+    private List<String> parseTools(String toolsJson) {
+        if (toolsJson == null || toolsJson.isEmpty()) {
+            return new ArrayList<>();
+        }
+        try {
+            return jsonMapper.readValue(toolsJson, new TypeReference<List<String>>() {});
+        } catch (Exception e) {
+            log.error("Failed to parse tools JSON: {}", toolsJson, e);
+            return new ArrayList<>();
+        }
     }
 
     /**
@@ -42,12 +60,12 @@ public class SkillsLoader {
     public List<Map<String, String>> listSkills(boolean filterUnavailable) {
         List<Map<String, String>> result = new ArrayList<>();
 
-        List<SkillDao.SkillRecord> records = skillDao.findAllEnabled();
+        List<SkillRecord> records = skillMapper.findAllEnabled();
         if (records == null) {
             log.warn("No skill records returned from database");
             return result;
         }
-        for (SkillDao.SkillRecord record : records) {
+        for (SkillRecord record : records) {
             Map<String, String> skill = new HashMap<>();
             skill.put("name", record.getSkillId());
             skill.put("path", "database:" + record.getSkillId());
@@ -66,7 +84,7 @@ public class SkillsLoader {
             return Optional.empty();
         }
 
-        SkillDao.SkillRecord record = skillDao.findById(name);
+        SkillRecord record = skillMapper.findById(name);
         if (record != null && record.getContent() != null) {
             return Optional.of(record.getContent());
         }
@@ -124,7 +142,7 @@ public class SkillsLoader {
      * 返回技能元数据
      */
     public Optional<Map<String, Object>> getSkillMetadata(String name) {
-        SkillDao.SkillRecord record = skillDao.findById(name);
+        SkillRecord record = skillMapper.findById(name);
         if (record == null) {
             return Optional.empty();
         }
@@ -137,7 +155,7 @@ public class SkillsLoader {
         meta.put("maxIterations", record.getMaxIterations());
 
         // 解析tools字段
-        List<String> tools = skillDao.parseTools(record.getTools());
+        List<String> tools = parseTools(record.getTools());
         meta.put("tools", tools);
 
         return Optional.of(meta);

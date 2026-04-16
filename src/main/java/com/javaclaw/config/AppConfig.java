@@ -3,7 +3,7 @@ package com.javaclaw.config;
 import com.javaclaw.agent.AgentLoop;
 import com.javaclaw.agent.tools.ToolRegistry;
 import com.javaclaw.agent.tools.DynamicToolLoader;
-import com.javaclaw.dao.SkillDao;
+import com.javaclaw.mapper.SkillMapper;
 import com.javaclaw.providers.LLMProvider;
 import com.javaclaw.session.SessionManager;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,7 +31,7 @@ public class AppConfig {
     private DynamicToolLoader dynamicToolLoader;
 
     @Autowired
-    private SkillDao skillDao;
+    private SkillMapper skillMapper;
 
     @Bean
     public AgentLoop agentLoop() {
@@ -57,7 +57,7 @@ public class AppConfig {
                 config.getTools().getMcpServers(),
                 toolRegistry,
                 dynamicToolLoader,
-                skillDao
+                skillMapper
         );
     }
 }

@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.javaclaw.mapper.SkillMapper">
+
+    <resultMap id="SkillResultMap" type="com.javaclaw.entity.SkillRecord">
+        <id property="skillId" column="skill_id"/>
+        <result property="name" column="name"/>
+        <result property="description" column="description"/>
+        <result property="content" column="content"/>
+        <result property="tools" column="tools"/>
+        <result property="enabled" column="enabled"/>
+        <result property="domain" column="domain"/>
+        <result property="examples" column="examples"/>
+        <result property="maxIterations" column="max_iterations"/>
+        <result property="userId" column="user_id"/>
+        <result property="creTime" column="cre_time"/>
+        <result property="updTime" column="upd_time"/>
+    </resultMap>
+
+    <select id="findAllEnabled" resultMap="SkillResultMap">
+        SELECT skill_id, name, description, content, tools, enabled, domain, examples, max_iterations, user_id, cre_time, upd_time
+        FROM agent_skills
+        WHERE enabled = 1
+    </select>
+
+    <select id="findById" resultMap="SkillResultMap">
+        SELECT skill_id, name, description, content, tools, enabled, domain, examples, max_iterations, user_id, cre_time, upd_time
+        FROM agent_skills
+        WHERE skill_id = #{skillId}
+    </select>
+
+    <select id="findByIds" resultMap="SkillResultMap">
+        SELECT skill_id, name, description, content, tools, enabled, domain, examples, max_iterations, user_id, cre_time, upd_time
+        FROM agent_skills
+        WHERE enabled = 1 AND skill_id IN
+        <foreach collection="skillIds" item="item" open="(" separator="," close=")">
+            #{item}
+        </foreach>
+    </select>
+
+    <insert id="saveOrUpdate" parameterType="com.javaclaw.entity.SkillRecord">
+        INSERT INTO agent_skills (skill_id, name, description, content, tools, enabled, domain, examples, max_iterations, user_id)
+        VALUES (#{skillId}, #{name}, #{description}, #{content}, #{tools}, 1, #{domain}, #{examples}, #{maxIterations}, #{userId})
+        ON DUPLICATE KEY UPDATE
+            name = VALUES(name),
+            description = VALUES(description),
+            content = VALUES(content),
+            tools = VALUES(tools),
+            upd_time = NOW()
+    </insert>
+
+    <delete id="delete">
+        DELETE FROM agent_skills WHERE skill_id = #{skillId}
+    </delete>
+
+    <update id="setEnabled">
+        UPDATE agent_skills SET enabled = #{enabled} WHERE skill_id = #{skillId}
+    </update>
+
+</mapper>

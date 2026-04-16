@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.javaclaw.mapper.ToolMapper">
+
+    <resultMap id="ToolResultMap" type="com.javaclaw.entity.ToolRecord">
+        <id property="toolKey" column="tool_key"/>
+        <result property="toolJson" column="tool_json"/>
+        <result property="enabled" column="enabled"/>
+        <result property="timeoutMs" column="timeout_ms"/>
+        <result property="maxRetries" column="max_retries"/>
+        <result property="userId" column="user_id"/>
+    </resultMap>
+
+    <select id="findAllEnabled" resultMap="ToolResultMap">
+        SELECT tool_key, tool_json, enabled, timeout_ms, max_retries, user_id
+        FROM agent_tools
+        WHERE enabled = 1
+    </select>
+
+    <select id="findByKey" resultMap="ToolResultMap">
+        SELECT tool_key, tool_json, enabled, timeout_ms, max_retries, user_id
+        FROM agent_tools
+        WHERE tool_key = #{toolKey}
+    </select>
+
+    <select id="findByKeys" resultMap="ToolResultMap">
+        SELECT tool_key, tool_json, enabled, timeout_ms, max_retries, user_id
+        FROM agent_tools
+        WHERE enabled = 1 AND tool_key IN
+        <foreach collection="toolKeys" item="item" open="(" separator="," close=")">
+            #{item}
+        </foreach>
+    </select>
+
+    <insert id="saveOrUpdate">
+        INSERT INTO agent_tools (tool_key, tool_json, enabled, timeout_ms, max_retries, user_id)
+        VALUES (#{toolKey}, #{toolJson}, 1, 30000, 3, #{userId})
+        ON DUPLICATE KEY UPDATE
+            tool_json = VALUES(tool_json),
+            upd_time = NOW()
+    </insert>
+
+    <delete id="delete">
+        DELETE FROM agent_tools WHERE tool_key = #{toolKey}
+    </delete>
+
+    <update id="setEnabled">
+        UPDATE agent_tools SET enabled = #{enabled} WHERE tool_key = #{toolKey}
+    </update>
+
+</mapper>

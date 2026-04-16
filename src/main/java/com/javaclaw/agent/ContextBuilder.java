@@ -1,6 +1,6 @@
 package com.javaclaw.agent;
 
-import com.javaclaw.dao.SkillDao;
+import com.javaclaw.mapper.SkillMapper;
 import lombok.extern.slf4j.Slf4j;
 
 import java.nio.charset.StandardCharsets;
@@ -23,9 +23,9 @@ public class ContextBuilder {
     private final Path workspace;
     private final SkillsLoader skillsLoader;
 
-    public ContextBuilder(Path workspace, SkillDao skillDao) {
+    public ContextBuilder(Path workspace, SkillMapper skillMapper) {
         this.workspace = workspace;
-        this.skillsLoader = new SkillsLoader(skillDao, workspace, null);
+        this.skillsLoader = new SkillsLoader(skillMapper, workspace, null);
     }
 
     public ContextBuilder(Path workspace, Path builtinSkillsDir, SkillsLoader skillsLoader) {

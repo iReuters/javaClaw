@@ -1,8 +1,11 @@
 package com.javaclaw.agent.tools;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.javaclaw.dao.SkillDao;
-import com.javaclaw.dao.ToolDao;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.javaclaw.entity.ToolRecord;
+import com.javaclaw.entity.SkillRecord;
+import com.javaclaw.mapper.ToolMapper;
+import com.javaclaw.mapper.SkillMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
@@ -22,10 +25,10 @@ import java.util.concurrent.ConcurrentHashMap;
 public class DynamicToolLoader {
 
     @Autowired
-    private ToolDao toolDao;
+    private ToolMapper toolMapper;
 
     @Autowired
-    private SkillDao skillDao;
+    private SkillMapper skillMapper;
 
     @Autowired
     private ApplicationContext applicationContext;
@@ -44,12 +47,12 @@ public class DynamicToolLoader {
      * 从数据库加载所有工具
      */
     public void loadAllTools() {
-        List<ToolDao.ToolRecord> records = toolDao.findAllEnabled();
+        List<ToolRecord> records = toolMapper.findAllEnabled();
         log.info("Loading {} tools from database", records.size());
 
-        for (ToolDao.ToolRecord record : records) {
+        for (ToolRecord record : records) {
             try {
-                DynamicTool tool = toolDao.parseToolFromJson(record.getToolJson());
+                DynamicTool tool = parseToolFromJson(record.getToolJson());
                 if (tool != null) {
                     dynamicTools.put(tool.getName(), tool);
                     log.info("Loaded tool: {} (type={})", tool.getName(), tool.getType());
@@ -57,6 +60,33 @@ public class DynamicToolLoader {
             } catch (Exception e) {
                 log.error("Failed to load tool: {}", record.getToolKey(), e);
             }
+        }
+    }
+
+    /**
+     * 解析工具JSON
+     */
+    private DynamicTool parseToolFromJson(String toolJson) {
+        try {
+            return jsonMapper.readValue(toolJson, DynamicTool.class);
+        } catch (Exception e) {
+            log.error("Failed to parse tool JSON: {}", toolJson, e);
+            return null;
+        }
+    }
+
+    /**
+     * 解析tools JSON字段
+     */
+    private List<String> parseTools(String toolsJson) {
+        if (toolsJson == null || toolsJson.isEmpty()) {
+            return new ArrayList<>();
+        }
+        try {
+            return jsonMapper.readValue(toolsJson, new TypeReference<List<String>>() {});
+        } catch (Exception e) {
+            log.error("Failed to parse tools JSON: {}", toolsJson, e);
+            return new ArrayList<>();
         }
     }
 
@@ -80,9 +110,9 @@ public class DynamicToolLoader {
         }
 
         // 从agent_skills表获取skill关联的工具
-        SkillDao.SkillRecord skillRecord = skillDao.findById(skillName);
+        SkillRecord skillRecord = skillMapper.findById(skillName);
         if (skillRecord != null && skillRecord.getTools() != null) {
-            tools.addAll(skillDao.parseTools(skillRecord.getTools()));
+            tools.addAll(parseTools(skillRecord.getTools()));
         }
 
         return tools;
@@ -100,13 +130,13 @@ public class DynamicToolLoader {
      */
     public List<String> getToolsForSkillFromDb(String skillId) {
         List<String> tools = new ArrayList<>();
-        ToolDao.ToolRecord record = toolDao.findByKey(skillId);
+        ToolRecord record = toolMapper.findByKey(skillId);
         if (record != null) {
             // 直接从agent_tools表查不到skill的工具，需要用skillId查agent_skills
         }
 
         // 通过skillId查询agent_skills获取关联的工具
-        // 这个逻辑需要SkillDao配合，暂时返回空
+        // 这个逻辑需要SkillMapper配合，暂时返回空
         return tools;
     }
 
