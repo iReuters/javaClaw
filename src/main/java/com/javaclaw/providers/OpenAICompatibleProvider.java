@@ -115,7 +115,7 @@ public class OpenAICompatibleProvider implements LLMProvider {
                     messages != null ? messages.size() : 0, 
                     tools != null ? tools.size() : 0);
             log.info("LLM request messages:\n{}", messageSummary.toString());
-            log.debug("LLM request body: {}", json);
+            log.info("LLM request body: {}", json);
             
             Response response = client.newCall(req.post(RequestBody.create(JSON, json)).build()).execute();
             

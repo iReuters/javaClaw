@@ -1,9 +1,0 @@
-{
-    "name": "get_server_time",
-    "description": "获取当前服务器时间（无参数工具示例）",
-    "parameters": {
-        "type": "object",
-        "properties": {}
-    },
-    "response": "当前服务器时间：%datetime%"
-}

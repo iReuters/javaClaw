@@ -168,16 +168,10 @@ public class AgentLoop {
         List<String> toolsUsed = new ArrayList<>();
         int iter = 0;
 
-        // 根据 skill 获取工具定义（合并 Bean 工具和动态工具）
+        // 加载所有工具定义（Bean 工具 + 动态工具）
         List<Map<String, Object>> toolDefs = new ArrayList<>(toolRegistry.getDefinitions());
         if (dynamicToolLoader != null) {
-            List<String> skillTools = dynamicToolLoader.getToolsForSkill(skillName);
-            for (String toolName : skillTools) {
-                DynamicTool dt = dynamicToolLoader.getDynamicTool(toolName);
-                if (dt != null) {
-                    toolDefs.add(dt.toSchema());
-                }
-            }
+            toolDefs.addAll(dynamicToolLoader.getAllDynamicToolDefinitions());
         }
 
         while (iter < maxIterations) {

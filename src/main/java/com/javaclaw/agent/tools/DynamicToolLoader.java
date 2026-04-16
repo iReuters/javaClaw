@@ -1,6 +1,7 @@
 package com.javaclaw.agent.tools;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.javaclaw.dao.SkillDao;
 import com.javaclaw.dao.ToolDao;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,6 +23,9 @@ public class DynamicToolLoader {
 
     @Autowired
     private ToolDao toolDao;
+
+    @Autowired
+    private SkillDao skillDao;
 
     @Autowired
     private ApplicationContext applicationContext;
@@ -71,20 +75,21 @@ public class DynamicToolLoader {
      */
     public List<String> getToolsForSkill(String skillName) {
         List<String> tools = new ArrayList<>();
-        tools.addAll(getDefaultTools());
-
-        // 从数据库获取skill关联的工具
-        ToolDao.ToolRecord toolRecord = toolDao.findByKey(skillName);
-        if (toolRecord != null) {
-            // skillName在agent_tools表中可能不存在，这里需要通过skill查找
+        if (skillName == null || skillName.isEmpty()) {
+            return tools;
         }
 
-        // 如果skill有直接关联的工具，从agent_skills表查询
+        // 从agent_skills表获取skill关联的工具
+        SkillDao.SkillRecord skillRecord = skillDao.findById(skillName);
+        if (skillRecord != null && skillRecord.getTools() != null) {
+            tools.addAll(skillDao.parseTools(skillRecord.getTools()));
+        }
+
         return tools;
     }
 
     /**
-     * 获取全局默认工具列表（暂时返回空的，实际从配置读取）
+     * 获取全局默认工具列表
      */
     private List<String> getDefaultTools() {
         return new ArrayList<>();
