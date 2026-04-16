@@ -1,5 +1,6 @@
 package com.javaclaw.agent;
 
+import com.javaclaw.dao.SkillDao;
 import lombok.extern.slf4j.Slf4j;
 
 import java.nio.charset.StandardCharsets;
@@ -22,14 +23,14 @@ public class ContextBuilder {
     private final Path workspace;
     private final SkillsLoader skillsLoader;
 
-    public ContextBuilder(Path workspace) {
+    public ContextBuilder(Path workspace, SkillDao skillDao) {
         this.workspace = workspace;
-        this.skillsLoader = new SkillsLoader(workspace, null);
+        this.skillsLoader = new SkillsLoader(skillDao, workspace, null);
     }
 
     public ContextBuilder(Path workspace, Path builtinSkillsDir, SkillsLoader skillsLoader) {
         this.workspace = workspace;
-        this.skillsLoader = skillsLoader != null ? skillsLoader : new SkillsLoader(workspace, builtinSkillsDir);
+        this.skillsLoader = skillsLoader != null ? skillsLoader : new SkillsLoader(null, workspace, builtinSkillsDir);
     }
 
     /** 组装系统提示：身份、bootstrap 文件、记忆、技能（常驻 + 摘要） */

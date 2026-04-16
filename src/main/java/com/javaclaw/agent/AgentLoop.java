@@ -6,6 +6,7 @@ import com.javaclaw.bus.OutboundMessage;
 import com.javaclaw.config.ExecToolConfig;
 import com.javaclaw.config.MCPServerConfig;
 import com.javaclaw.cron.CronService;
+import com.javaclaw.dao.SkillDao;
 import com.javaclaw.providers.LLMProvider;
 import com.javaclaw.providers.ToolCallRequest;
 import com.javaclaw.session.Session;
@@ -63,7 +64,8 @@ public class AgentLoop {
                     SessionManager sessionManager,
                     Map<String, MCPServerConfig> mcpServers,
                     ToolRegistry toolRegistry,
-                    DynamicToolLoader dynamicToolLoader) {
+                    DynamicToolLoader dynamicToolLoader,
+                    SkillDao skillDao) {
         this.provider = provider;
         this.workspace = workspace != null ? workspace : java.nio.file.Paths.get(".", ".javaclawbot");
         this.model = model != null && !model.isEmpty() ? model : provider.getDefaultModel();
@@ -76,7 +78,7 @@ public class AgentLoop {
         this.sessionManager = sessionManager;
         this.cronService = cronService;
         this.mcpServers = mcpServers != null ? mcpServers : Collections.emptyMap();
-        this.skillsLoader = new SkillsLoader(this.workspace, null);
+        this.skillsLoader = new SkillsLoader(skillDao, this.workspace, null);
         this.contextBuilder = new ContextBuilder(this.workspace, null, skillsLoader);
         this.toolRegistry = toolRegistry;
         this.dynamicToolLoader = dynamicToolLoader;
