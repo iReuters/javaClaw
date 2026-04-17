@@ -5,6 +5,7 @@ import com.javaclaw.bus.InboundMessage;
 import com.javaclaw.bus.OutboundMessage;
 import com.javaclaw.config.ExecToolConfig;
 import com.javaclaw.config.MCPServerConfig;
+import com.javaclaw.context.SkillContext;
 import com.javaclaw.cron.CronService;
 import com.javaclaw.mapper.SkillMapper;
 import com.javaclaw.providers.LLMProvider;
@@ -184,6 +185,10 @@ public class AgentLoop {
         List<AgentStep> steps = new ArrayList<>();
         int iter = 0;
 
+        // 设置当前 skill 到 ThreadLocal，供 AOP 切面获取
+        SkillContext.setSkill(skillName);
+        try {
+
         // 加载所有工具定义（Bean 工具 + 动态工具）
         List<Map<String, Object>> toolDefs = new ArrayList<>(toolRegistry.getDefinitions());
         if (dynamicToolLoader != null) {
@@ -279,6 +284,9 @@ public class AgentLoop {
         steps.add(maxIterStep);
 
         return new RunResult("[Max tool iterations reached]", toolsUsed, steps);
+        } finally {
+            SkillContext.clear();
+        }
     }
 
     /** 执行工具（动态工具优先，Bean 工具兜底） */

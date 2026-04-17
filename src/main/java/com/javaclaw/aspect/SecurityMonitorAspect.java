@@ -1,5 +1,6 @@
 package com.javaclaw.aspect;
 
+import com.javaclaw.context.SkillContext;
 import com.javaclaw.service.AuditLogService;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
@@ -21,8 +22,7 @@ public class SecurityMonitorAspect {
     private AuditLogService auditLogService;
 
     private static final String DEFAULT_LLM_MODEL = "deepseek-chat";
-    private static final String DEFAULT_SESSION_ID = "unknown";
-    private static final String DEFAULT_TOOL_TYPE = "tool";
+    private static final String DEFAULT_MEMORY_ID = "unknown";
 
     @Pointcut("execution(* com.javaclaw.agent.tools.ToolRegistry.execute(..))")
     public void toolExecutePointcut() {}
@@ -34,7 +34,8 @@ public class SecurityMonitorAspect {
     public Object aroundToolExecute(ProceedingJoinPoint joinPoint) throws Throwable {
         String toolName = extractToolName(joinPoint);
         long startTime = System.currentTimeMillis();
-        String sessionId = extractSessionId(joinPoint);
+        String memoryId = extractMemoryId(joinPoint);
+        String skillName = SkillContext.getSkill();  // 从 ThreadLocal 获取当前 skill
         String resultValue = "";
         boolean success = true;
         String errorMsg = null;
@@ -53,9 +54,9 @@ public class SecurityMonitorAspect {
             Map<String, Object> params = extractParams(joinPoint);
 
             auditLogService.logToolCall(
-                    sessionId,
+                    memoryId,
                     toolName,
-                    DEFAULT_TOOL_TYPE,
+                    skillName,  // 传入当前 skill 名称，可能为空
                     durationMs,
                     DEFAULT_LLM_MODEL,
                     0,
@@ -93,15 +94,15 @@ public class SecurityMonitorAspect {
         return params;
     }
 
-    private String extractSessionId(ProceedingJoinPoint joinPoint) {
+    private String extractMemoryId(ProceedingJoinPoint joinPoint) {
         Object[] args = joinPoint.getArgs();
         if (args.length > 1 && args[1] instanceof Map) {
             Map<String, Object> params = (Map<String, Object>) args[1];
-            Object sessionId = params.get("sessionId");
-            if (sessionId != null) {
-                return sessionId.toString();
+            Object memoryId = params.get("sessionKey");
+            if (memoryId != null) {
+                return memoryId.toString();
             }
         }
-        return DEFAULT_SESSION_ID;
+        return DEFAULT_MEMORY_ID;
     }
 }

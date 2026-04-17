@@ -13,7 +13,7 @@ public interface AuditLogMapper {
 
     AuditLog findById(@Param("id") Long id);
 
-    List<AuditLog> findBySessionId(@Param("sessionId") String sessionId);
+    List<AuditLog> findByMemoryId(@Param("memoryId") String memoryId);
 
     List<AuditLog> findByToolName(@Param("toolName") String toolName);
 

@@ -11,9 +11,9 @@ import java.sql.Timestamp;
 public class AuditLog {
 
     private Long id;
-    private String sessionId;
+    private String memoryId;
     private String toolName;
-    private String toolType;  // tool 或 skill
+    private String skillName;  // 调用时所在的 skill 名称，没有则为空
     private Timestamp callTime;
     private Integer durationMs;
     private String llmModel;

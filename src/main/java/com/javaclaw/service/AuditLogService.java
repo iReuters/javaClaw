@@ -24,14 +24,14 @@ public class AuditLogService {
     ));
 
     @Async
-    public void logToolCall(String sessionId, String toolName, String toolType,
+    public void logToolCall(String memoryId, String toolName, String skillName,
                            long durationMs, String llmModel, int iterationCount,
                            Map<String, Object> params, String result, boolean success, String errorMsg) {
         try {
             AuditLog auditLog = new AuditLog();
-            auditLog.setSessionId(sessionId);
+            auditLog.setMemoryId(memoryId);
             auditLog.setToolName(toolName);
-            auditLog.setToolType(toolType);
+            auditLog.setSkillName(skillName);
             auditLog.setCallTime(new java.sql.Timestamp(System.currentTimeMillis()));
             auditLog.setDurationMs((int) durationMs);
             auditLog.setLlmModel(llmModel);
@@ -78,8 +78,8 @@ public class AuditLogService {
         return auditLogMapper.findById(id);
     }
 
-    public List<AuditLog> getBySessionId(String sessionId) {
-        return auditLogMapper.findBySessionId(sessionId);
+    public List<AuditLog> getByMemoryId(String memoryId) {
+        return auditLogMapper.findByMemoryId(memoryId);
     }
 
     public List<AuditLog> getByPage(int page, int size) {
