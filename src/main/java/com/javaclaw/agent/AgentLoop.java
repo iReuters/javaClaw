@@ -185,108 +185,155 @@ public class AgentLoop {
         List<AgentStep> steps = new ArrayList<>();
         int iter = 0;
 
-        // 设置当前 skill 到 ThreadLocal，供 AOP 切面获取
-        SkillContext.setSkill(skillName);
-        try {
+        // 第一次 LLM 调用：让模型选择 skill（不传 tool definitions）
+        com.javaclaw.providers.LLMResponse firstResponse = provider.chat(
+                messages,
+                null,  // 第一次不需要 tool definitions
+                model,
+                maxTokens,
+                temperature,
+                streamConsumer);
 
-        // 加载所有工具定义（Bean 工具 + 动态工具）
-        List<Map<String, Object>> toolDefs = new ArrayList<>(toolRegistry.getDefinitions());
-        if (dynamicToolLoader != null) {
-            toolDefs.addAll(dynamicToolLoader.getAllDynamicToolDefinitions());
+        // 解析 LLM 回复，获取 skillId
+        String selectedSkillId = parseSkillIdFromResponse(firstResponse.getContent());
+        log.info("LLM selected skill: {}", selectedSkillId);
+
+        // 加载选中的 skill 内容
+        String skillContent = skillsLoader.loadSkill(selectedSkillId).orElse("");
+        if (!skillContent.isEmpty()) {
+            // 用 skill 内容更新 system message
+            updateSystemMessageWithSkill(messages, selectedSkillId, skillContent);
         }
 
-        while (iter < maxIterations) {
-            iter++;
-            AgentStep step = new AgentStep(iter, "tool_call");
-            com.javaclaw.providers.LLMResponse response = provider.chat(
-                    messages,
-                    toolDefs,
-                    model,
-                    maxTokens,
-                    temperature,
-                    streamConsumer);
+        // 设置当前 skill 到 ThreadLocal，供 AOP 切面获取
+        SkillContext.setSkill(selectedSkillId);
+        try {
+            // 加载所有工具定义（Bean 工具 + 动态工具）
+            List<Map<String, Object>> toolDefs = new ArrayList<>(toolRegistry.getDefinitions());
+            if (dynamicToolLoader != null) {
+                toolDefs.addAll(dynamicToolLoader.getAllDynamicToolDefinitions());
+            }
 
-            // 设置思考内容
-            step.setReasoning(response.getReasoningContent());
+            while (iter < maxIterations) {
+                iter++;
+                AgentStep step = new AgentStep(iter, "tool_call");
+                com.javaclaw.providers.LLMResponse response = provider.chat(
+                        messages,
+                        toolDefs,
+                        model,
+                        maxTokens,
+                        temperature,
+                        streamConsumer);
 
-            if (response.hasToolCalls()) {
-                List<Map<String, Object>> toolCallsForMessage = new ArrayList<>();
-                for (ToolCallRequest tc : response.getToolCalls()) {
-                    Map<String, Object> fn = new HashMap<>();
-                    fn.put("id", tc.getId());
-                    fn.put("type", "function");
-                    Map<String, Object> f = new HashMap<>();
-                    f.put("name", tc.getName());
-                    try {
-                        f.put("arguments", MAPPER.writeValueAsString(tc.getArguments()));
-                    } catch (Exception e) {
-                        f.put("arguments", "{}");
-                    }
-                    fn.put("function", f);
-                    toolCallsForMessage.add(fn);
-
-                    // 添加工具调用到步骤
-                    step.addToolCall(tc.getId(), tc.getName(), tc.getArguments() != null ? tc.getArguments().toString() : "{}");
-                }
-
-                // 设置回复内容（可能是空或简短总结）
-                step.setContent(response.getContent());
-                step.setType("tool_call");
-
-                contextBuilder.addAssistantMessage(messages,
-                        response.getContent(),
-                        toolCallsForMessage,
-                        response.getReasoningContent());
-
-                // 执行工具调用并记录结果
-                for (ToolCallRequest tc : response.getToolCalls()) {
-                    Map<String, Object> params = new HashMap<>(tc.getArguments() != null ? tc.getArguments() : Collections.<String, Object>emptyMap());
-                    if (requestContext != null) {
-                        params.putAll(requestContext);
-                    }
-                    String result = executeTool(tc.getName(), params);
-                    toolsUsed.add(tc.getName());
-                    step.addToolResult(tc.getName(), result);
-                    contextBuilder.addToolResult(messages, tc.getId(), tc.getName(), result);
-                }
-
-                // 回调步骤
-                if (stepCallback != null) {
-                    stepCallback.accept(step);
-                }
-                steps.add(step);
-
-                Map<String, Object> userReflect = new HashMap<>();
-                userReflect.put("role", "user");
-                userReflect.put("content", REFLECT_USER_MSG);
-                messages.add(userReflect);
-            } else {
-                // 最终回复步骤
-                step.setType("final");
-                step.setContent(response.getContent() != null ? response.getContent() : "");
+                // 设置思考内容
                 step.setReasoning(response.getReasoningContent());
 
-                if (stepCallback != null) {
-                    stepCallback.accept(step);
+                if (response.hasToolCalls()) {
+                    List<Map<String, Object>> toolCallsForMessage = new ArrayList<>();
+                    for (ToolCallRequest tc : response.getToolCalls()) {
+                        Map<String, Object> fn = new HashMap<>();
+                        fn.put("id", tc.getId());
+                        fn.put("type", "function");
+                        Map<String, Object> f = new HashMap<>();
+                        f.put("name", tc.getName());
+                        try {
+                            f.put("arguments", MAPPER.writeValueAsString(tc.getArguments()));
+                        } catch (Exception e) {
+                            f.put("arguments", "{}");
+                        }
+                        fn.put("function", f);
+                        toolCallsForMessage.add(fn);
+
+                        // 添加工具调用到步骤
+                        step.addToolCall(tc.getId(), tc.getName(), tc.getArguments() != null ? tc.getArguments().toString() : "{}");
+                    }
+
+                    // 设置回复内容（可能是空或简短总结）
+                    step.setContent(response.getContent());
+                    step.setType("tool_call");
+
+                    contextBuilder.addAssistantMessage(messages,
+                            response.getContent(),
+                            toolCallsForMessage,
+                            response.getReasoningContent());
+
+                    // 执行工具调用并记录结果
+                    for (ToolCallRequest tc : response.getToolCalls()) {
+                        Map<String, Object> params = new HashMap<>(tc.getArguments() != null ? tc.getArguments() : Collections.<String, Object>emptyMap());
+                        if (requestContext != null) {
+                            params.putAll(requestContext);
+                        }
+                        String result = executeTool(tc.getName(), params);
+                        toolsUsed.add(tc.getName());
+                        step.addToolResult(tc.getName(), result);
+                        contextBuilder.addToolResult(messages, tc.getId(), tc.getName(), result);
+                    }
+
+                    // 回调步骤
+                    if (stepCallback != null) {
+                        stepCallback.accept(step);
+                    }
+                    steps.add(step);
+
+                    Map<String, Object> userReflect = new HashMap<>();
+                    userReflect.put("role", "user");
+                    userReflect.put("content", REFLECT_USER_MSG);
+                    messages.add(userReflect);
+                } else {
+                    // 最终回复步骤
+                    step.setType("final");
+                    step.setContent(response.getContent() != null ? response.getContent() : "");
+                    step.setReasoning(response.getReasoningContent());
+
+                    if (stepCallback != null) {
+                        stepCallback.accept(step);
+                    }
+                    steps.add(step);
+
+                    return new RunResult(response.getContent(), toolsUsed, steps);
                 }
-                steps.add(step);
-
-                return new RunResult(response.getContent(), toolsUsed, steps);
             }
-        }
 
-        // 达到最大迭代次数
-        AgentStep maxIterStep = new AgentStep(iter, "max_iterations");
-        maxIterStep.setContent("[Max tool iterations reached]");
-        if (stepCallback != null) {
-            stepCallback.accept(maxIterStep);
-        }
-        steps.add(maxIterStep);
+            // 达到最大迭代次数
+            AgentStep maxIterStep = new AgentStep(iter, "max_iterations");
+            maxIterStep.setContent("[Max tool iterations reached]");
+            if (stepCallback != null) {
+                stepCallback.accept(maxIterStep);
+            }
+            steps.add(maxIterStep);
 
-        return new RunResult("[Max tool iterations reached]", toolsUsed, steps);
+            return new RunResult("[Max tool iterations reached]", toolsUsed, steps);
         } finally {
             SkillContext.clear();
         }
+    }
+
+    /**
+     * 从 LLM 回复中解析 skillId
+     * 期望格式：USE_SKILL: <skill_id>
+     */
+    private String parseSkillIdFromResponse(String content) {
+        if (content == null || content.isEmpty()) {
+            return "metadata";
+        }
+        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("USE_SKILL:\\s*(\\S+)");
+        java.util.regex.Matcher matcher = pattern.matcher(content);
+        if (matcher.find()) {
+            return matcher.group(1);
+        }
+        log.warn("Failed to parse skillId from response: {}", content);
+        return "metadata";
+    }
+
+    /**
+     * 用 skill 内容更新 system message
+     */
+    private void updateSystemMessageWithSkill(List<Map<String, Object>> messages, String skillId, String skillContent) {
+        if (messages.isEmpty()) return;
+        Map<String, Object> systemMsg = messages.get(0);
+        String existingContent = (String) systemMsg.getOrDefault("content", "");
+        String updatedContent = existingContent + "\n\n=== Selected Skill: " + skillId + " ===\n\n" + skillContent;
+        systemMsg.put("content", updatedContent);
     }
 
     /** 执行工具（动态工具优先，Bean 工具兜底） */
