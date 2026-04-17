@@ -1,0 +1,35 @@
+javaclaw:
+  agents:
+    workspace: .javaclawbot/
+    model: deepseek-chat
+    maxTokens: 4096
+    temperature: 0.7
+    maxToolIterations: 10
+    memoryWindow: 20
+    defaultProvider: openai
+  providers:
+    openai:
+      apiKey: sk-630a3f249e6a464dbafc05c726b1e97e
+      apiBase: https://api.deepseek.com/v1
+  gateway:
+    host: 0.0.0.0
+    port: 8765
+  tools:
+    exec:
+      timeoutSeconds: 60
+    restrictToWorkspace: true
+    webSearchApiKey: ""
+    mcpServers: {}
+  datasource:
+    host: 127.0.0.1
+    port: 33060
+    database: javaclaw
+    username: root
+    password: ztfasdf123
+
+mybatis:
+  mapper-locations: classpath:mybatis/mapper/*.xml
+  type-aliases-package: com.javaclaw.entity
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
