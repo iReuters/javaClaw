@@ -50,6 +50,11 @@ public class ContextBuilder {
             }
         }
 
+        // 注入 skill 清单
+        sb.append("=== Available Skills ===\n");
+        sb.append(skillsLoader.buildSkillListForPrompt());
+        sb.append("\n请根据用户请求，回复：USE_SKILL: <skill_id>\n\n");
+
         if (skillNames != null && !skillNames.isEmpty()) {
             sb.append(skillsLoader.loadSkillsForContext(skillNames));
         }
