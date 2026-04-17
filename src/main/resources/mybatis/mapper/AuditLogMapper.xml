@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.javaclaw.mapper.AuditLogMapper">
+
+    <insert id="insert" parameterType="com.javaclaw.entity.AuditLog" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO agent_audit_log (session_id, tool_name, tool_type, call_time, duration_ms,
+            llm_model, iteration_count, params, result, success, error_msg, cre_time)
+        VALUES (#{sessionId}, #{toolName}, #{toolType}, #{callTime}, #{durationMs},
+            #{llmModel}, #{iterationCount}, #{params}, #{result}, #{success}, #{errorMsg}, NOW())
+    </insert>
+
+    <select id="findById" resultType="com.javaclaw.entity.AuditLog">
+        SELECT * FROM agent_audit_log WHERE id = #{id}
+    </select>
+
+    <select id="findBySessionId" resultType="com.javaclaw.entity.AuditLog">
+        SELECT * FROM agent_audit_log WHERE session_id = #{sessionId} ORDER BY call_time DESC
+    </select>
+
+    <select id="findByToolName" resultType="com.javaclaw.entity.AuditLog">
+        SELECT * FROM agent_audit_log WHERE tool_name = #{toolName} ORDER BY call_time DESC
+    </select>
+
+    <select id="findByTimeRange" resultType="com.javaclaw.entity.AuditLog">
+        SELECT * FROM agent_audit_log
+        WHERE call_time BETWEEN #{startTime} AND #{endTime}
+        ORDER BY call_time DESC
+    </select>
+
+    <select id="findByPage" resultType="com.javaclaw.entity.AuditLog">
+        SELECT * FROM agent_audit_log ORDER BY call_time DESC LIMIT #{offset}, #{limit}
+    </select>
+
+    <select id="countAll" resultType="long">
+        SELECT COUNT(*) FROM agent_audit_log
+    </select>
+
+    <select id="statsByTool" resultType="java.util.Map">
+        SELECT tool_name as toolName, COUNT(*) as callCount,
+            SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END) as successCount
+        FROM agent_audit_log
+        GROUP BY tool_name
+        ORDER BY callCount DESC
+    </select>
+
+    <select id="statsByDay" resultType="java.util.Map">
+        SELECT DATE(call_time) as day, COUNT(*) as callCount,
+            SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END) as successCount
+        FROM agent_audit_log
+        GROUP BY DATE(call_time)
+        ORDER BY day DESC
+    </select>
+
+</mapper>
