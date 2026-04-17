@@ -1,6 +1,7 @@
 package com.javaclaw.config;
 
 import com.javaclaw.agent.AgentLoop;
+import com.javaclaw.agent.SkillService;
 import com.javaclaw.agent.tools.ToolRegistry;
 import com.javaclaw.agent.tools.DynamicToolLoader;
 import com.javaclaw.mapper.SkillMapper;
@@ -33,6 +34,9 @@ public class AppConfig {
     @Autowired
     private SkillMapper skillMapper;
 
+    @Autowired
+    private SkillService skillService;
+
     @Bean
     public AgentLoop agentLoop() {
         // 初始化工作区
@@ -57,7 +61,8 @@ public class AppConfig {
                 config.getTools().getMcpServers(),
                 toolRegistry,
                 dynamicToolLoader,
-                skillMapper
+                skillMapper,
+                skillService
         );
     }
 }

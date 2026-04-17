@@ -1,0 +1,16 @@
+{
+  "max_tokens": 4096,
+  "stream": true,
+  "temperature": 0.7,
+  "messages": [
+    {
+      "role": "system",
+      "content": "Current time: 2026-04-16T13:52:49.069+08:00[Asia/Shanghai]\n\nWorkspace: .javaclawbot\n\n### news-skill\n\n# 新闻资讯 Skill\n\n基于公开模拟数据的新闻查询助手。\n\n## 可用工具\n\n| 工具名 | 说明 |\n|--------|------|\n| get_latest_news | 获取最新新闻（无需参数） |\n| search_news | 搜索新闻（需传入搜索关键词） |\n\n## 使用示例\n\n- 「今天有什么新闻？」 → 调用 get_latest_news\n- 「搜索AI相关的新闻」 → 调用 search_news，关键词为「AI」\n\n### tool-demo-skill\n\n# 工具演示 Skill\n\n这个 skill 演示如何让 AI 通过 skill 调用各种工具。\n\n## 可用工具\n\n| 工具名 | 类型 | 说明 |\n|--------|------|------|\n| get_weather | Spring Bean | 查询城市天气 |\n| get_server_time | 动态工具 | 获取服务器当前时间 |\n| calculate | 动态工具 | 执行数学计算 |\n\n## 使用示例\n\n- 「北京今天天气怎么样？」 → 调用 get_weather\n- 「现在几点了？」 → 调用 get_server_time\n- 「帮我算一下 (2+3)*4」 → 调用 calculate\n\nAvailable skills: news-skill, tool-demo-skill\n"
+    },
+    {
+      "role": "user",
+      "content": "你有什么工具"
+    }
+  ],
+  "model": "deepseek-chat"
+}

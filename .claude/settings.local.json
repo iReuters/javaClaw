@@ -1,7 +1,35 @@
 {
   "permissions": {
     "allow": [
-      "Bash(mvn compile:*)"
+      "Bash(mvn compile:*)",
+      "Bash(mysql -h 127.0.0.1 -P 33060 -u root -ptfcasdf123 -e \"SELECT 1 AS connected;\")",
+      "Bash(where mysql *)",
+      "Bash(dir \"C:\\\\Program Files\\\\MySQL\\\\*\")",
+      "Bash(timeout 15 mvn spring-boot:run -q)",
+      "Bash(netstat -ano)",
+      "Bash(taskkill //F //PID 14600)",
+      "Bash(timeout 12 mvn spring-boot:run -q)",
+      "Bash(taskkill //F //PID 17516)",
+      "Bash(awk '{print $5}')",
+      "Bash(xargs -I{} taskkill //F //PID {})",
+      "Bash(curl -s -X POST http://localhost:8080/chat/stream -H \"Content-Type: application/json\" -d '{\"channel\":\"test\",\"chatId\":\"123\",\"content\":\"北京天气怎么样？\"}')",
+      "Bash(curl -s -X POST http://localhost:8080/api/chat -H \"Content-Type: application/json\" -d '{\"channel\":\"test\",\"chatId\":\"123\",\"content\":\"北京天气怎么样？\"}')",
+      "Bash(mvn spring-boot:run -q)",
+      "Bash(curl -s -X POST http://localhost:8080/api/chat -H \"Content-Type: application/json\" -d '{\"channel\":\"test\",\"chatId\":\"123\",\"content\":\"你有什么工具\"}')",
+      "Bash(pkill -f \"spring-boot:run\")",
+      "Bash(curl -s -X POST http://localhost:8080/api/chat -H \"Content-Type: application/json; charset=utf-8\" -d \"{\\\\\"channel\\\\\":\\\\\"test\\\\\",\\\\\"chatId\\\\\":\\\\\"123\\\\\",\\\\\"content\\\\\":\\\\\"what tools do you have\\\\\"}\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:8080/agent.html)",
+      "Bash(curl -X POST http://localhost:8080/api/chat/stream/steps -H \"Content-Type: application/json\" -d \"{\\\\\"message\\\\\":\\\\\"北京天气怎么样？\\\\\"}\")",
+      "Bash(curl -X POST http://localhost:8080/api/chat/stream/steps -H \"Content-Type: application/json\" -d '{\"message\":\"What is the weather in Beijing?\"}')",
+      "Bash(curl -X POST http://localhost:8080/api/chat/stream/steps -H \"Content-Type: application/json\" -d '{\"message\":\"What is 2+2?\"}')",
+      "Bash(awk '{print $2}')",
+      "Bash(xargs -r kill -9)",
+      "Bash(taskkill //F //PID 3016)",
+      "Bash(taskkill:*)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(mvn package *)",
+      "Bash(mvn clean *)"
     ]
   }
 }

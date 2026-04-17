@@ -46,6 +46,7 @@ public class AgentLoop {
     private final DynamicToolLoader dynamicToolLoader;
     private final ContextBuilder contextBuilder;
     private final SkillsLoader skillsLoader;
+    private final SkillService skillService;
 
     private CronService cronService;
     private Map<String, MCPServerConfig> mcpServers;
@@ -66,7 +67,8 @@ public class AgentLoop {
                     Map<String, MCPServerConfig> mcpServers,
                     ToolRegistry toolRegistry,
                     DynamicToolLoader dynamicToolLoader,
-                    SkillMapper skillMapper) {
+                    SkillMapper skillMapper,
+                    SkillService skillService) {
         this.provider = provider;
         this.workspace = workspace != null ? workspace : java.nio.file.Paths.get(".", ".javaclawbot");
         this.model = model != null && !model.isEmpty() ? model : provider.getDefaultModel();
@@ -80,7 +82,8 @@ public class AgentLoop {
         this.cronService = cronService;
         this.mcpServers = mcpServers != null ? mcpServers : Collections.emptyMap();
         this.skillsLoader = new SkillsLoader(skillMapper, this.workspace, null);
-        this.contextBuilder = new ContextBuilder(this.workspace, null, skillsLoader);
+        this.skillService = skillService;
+        this.contextBuilder = new ContextBuilder(this.workspace, skillsLoader, skillService);
         this.toolRegistry = toolRegistry;
         this.dynamicToolLoader = dynamicToolLoader;
     }
@@ -185,35 +188,19 @@ public class AgentLoop {
         List<AgentStep> steps = new ArrayList<>();
         int iter = 0;
 
-        // 第一次 LLM 调用：让模型选择 skill（不传 tool definitions）
-        com.javaclaw.providers.LLMResponse firstResponse = provider.chat(
-                messages,
-                null,  // 第一次不需要 tool definitions
-                model,
-                maxTokens,
-                temperature,
-                streamConsumer);
-
-        // 解析 LLM 回复，获取 skillId
-        String selectedSkillId = parseSkillIdFromResponse(firstResponse.getContent());
-        log.info("LLM selected skill: {}", selectedSkillId);
-
-        // 加载选中的 skill 内容
-        String skillContent = skillsLoader.loadSkill(selectedSkillId).orElse("");
-        if (!skillContent.isEmpty()) {
-            // 用 skill 内容更新 system message
-            updateSystemMessageWithSkill(messages, selectedSkillId, skillContent);
+        // 加载所有工具定义（Bean 工具 + 动态工具 + SkillTool）
+        List<Map<String, Object>> toolDefs = new ArrayList<>(toolRegistry.getDefinitions());
+        if (dynamicToolLoader != null) {
+            toolDefs.addAll(dynamicToolLoader.getAllDynamicToolDefinitions());
         }
 
-        // 设置当前 skill 到 ThreadLocal，供 AOP 切面获取
-        SkillContext.setSkill(selectedSkillId);
-        try {
-            // 加载所有工具定义（Bean 工具 + 动态工具）
-            List<Map<String, Object>> toolDefs = new ArrayList<>(toolRegistry.getDefinitions());
-            if (dynamicToolLoader != null) {
-                toolDefs.addAll(dynamicToolLoader.getAllDynamicToolDefinitions());
-            }
+        // SkillTool 已经在 ToolRegistry 中注册，会被自动包含
 
+        // 设置当前 skill 到 ThreadLocal，供 AOP 切面获取（默认 metadata）
+        String currentSkill = skillName != null ? skillName : "metadata";
+        SkillContext.setSkill(currentSkill);
+
+        try {
             while (iter < maxIterations) {
                 iter++;
                 AgentStep step = new AgentStep(iter, "tool_call");

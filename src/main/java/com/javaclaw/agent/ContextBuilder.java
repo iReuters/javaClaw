@@ -22,15 +22,24 @@ public class ContextBuilder {
 
     private final Path workspace;
     private final SkillsLoader skillsLoader;
+    private final SkillService skillService;
 
     public ContextBuilder(Path workspace, SkillMapper skillMapper) {
         this.workspace = workspace;
         this.skillsLoader = new SkillsLoader(skillMapper, workspace, null);
+        this.skillService = null;
     }
 
     public ContextBuilder(Path workspace, Path builtinSkillsDir, SkillsLoader skillsLoader) {
         this.workspace = workspace;
         this.skillsLoader = skillsLoader != null ? skillsLoader : new SkillsLoader(null, workspace, builtinSkillsDir);
+        this.skillService = null;
+    }
+
+    public ContextBuilder(Path workspace, SkillsLoader skillsLoader, SkillService skillService) {
+        this.workspace = workspace;
+        this.skillsLoader = skillsLoader;
+        this.skillService = skillService;
     }
 
     /** 组装系统提示：身份、bootstrap 文件、记忆、技能（常驻 + 摘要） */
@@ -52,8 +61,12 @@ public class ContextBuilder {
 
         // 注入 skill 清单（第一次调用时不加载完整内容，等 LLM 选择后再加载）
         sb.append("=== Available Skills ===\n");
-        sb.append(skillsLoader.buildSkillListForPrompt());
-        sb.append("\n请根据用户请求，回复：USE_SKILL: <skill_id>\n\n");
+        if (skillService != null) {
+            sb.append(skillService.buildSkillListForPrompt());
+        } else {
+            sb.append(skillsLoader.buildSkillListForPrompt());
+        }
+        sb.append("\n当用户请求需要使用某个技能时，先调用 get_skill_content 工具获取技能详情。\n\n");
 
         // 注意：skillNames 在 skill 选择阶段不应该加载完整内容
         // 完整内容在 AgentLoop.runAgentLoop() 中根据选中的 skill 加载
