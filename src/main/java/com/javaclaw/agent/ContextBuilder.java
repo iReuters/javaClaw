@@ -50,15 +50,13 @@ public class ContextBuilder {
             }
         }
 
-        // 注入 skill 清单
+        // 注入 skill 清单（第一次调用时不加载完整内容，等 LLM 选择后再加载）
         sb.append("=== Available Skills ===\n");
         sb.append(skillsLoader.buildSkillListForPrompt());
         sb.append("\n请根据用户请求，回复：USE_SKILL: <skill_id>\n\n");
 
-        if (skillNames != null && !skillNames.isEmpty()) {
-            sb.append(skillsLoader.loadSkillsForContext(skillNames));
-        }
-        sb.append(skillsLoader.buildSkillsSummary());
+        // 注意：skillNames 在 skill 选择阶段不应该加载完整内容
+        // 完整内容在 AgentLoop.runAgentLoop() 中根据选中的 skill 加载
         return sb.toString();
     }
 
