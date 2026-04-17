@@ -35,16 +35,18 @@ public class SecurityMonitorAspect {
         String toolName = extractToolName(joinPoint);
         long startTime = System.currentTimeMillis();
         String sessionId = extractSessionId(joinPoint);
-        String result;
+        String resultValue = "";
         boolean success = true;
         String errorMsg = null;
+        Object returnValue = null;
 
         try {
-            result = (String) joinPoint.proceed();
+            returnValue = joinPoint.proceed();
+            resultValue = returnValue != null ? returnValue.toString() : "";
         } catch (Throwable t) {
             success = false;
             errorMsg = t.getMessage();
-            result = "[Error: " + t.getMessage() + "]";
+            resultValue = "[Error: " + t.getMessage() + "]";
             throw t;
         } finally {
             long durationMs = System.currentTimeMillis() - startTime;
@@ -58,11 +60,13 @@ public class SecurityMonitorAspect {
                     DEFAULT_LLM_MODEL,
                     0,
                     params,
-                    result,
+                    resultValue,
                     success,
                     errorMsg
             );
         }
+
+        return returnValue;
     }
 
     private String extractToolName(ProceedingJoinPoint joinPoint) {
