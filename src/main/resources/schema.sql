@@ -17,3 +17,6 @@ CREATE TABLE IF NOT EXISTS agent_audit_log (
     INDEX idx_tool_name (tool_name),
     INDEX idx_call_time (call_time)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='智能体工具调用审计日志';
+
+-- 添加 agent_skills 表的 upd_time 字段
+ALTER TABLE agent_skills ADD COLUMN upd_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间';
