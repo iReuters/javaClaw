@@ -110,6 +110,44 @@ public class SkillsLoader {
     }
 
     /**
+     * 构建 skill 清单用于 prompt 注入
+     * 格式：
+     * 请根据用户意图选择最匹配的技能，若无匹配或意图不明显，使用 metadata：
+     *
+     * 1. metadata (始终可用)
+     *    描述：基础助手能力，支持通用对话、问答、计算、翻译等
+     *
+     * 2. news-skill
+     *    描述：获取最新新闻资讯...
+     */
+    public String buildSkillListForPrompt() {
+        List<SkillRecord> records = skillMapper.findAllEnabled();
+        if (records == null || records.isEmpty()) {
+            return "";
+        }
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("请根据用户意图选择最匹配的技能，若无匹配或意图不明显，使用 metadata：\n\n");
+
+        // metadata 固定在第一个位置
+        sb.append("1. metadata (始终可用)\n");
+        sb.append("   描述：基础助手能力，支持通用对话、问答、计算、翻译等\n\n");
+
+        int idx = 2;
+        for (SkillRecord record : records) {
+            // 跳过 metadata，因为已手动添加
+            if ("metadata".equals(record.getSkillId())) {
+                continue;
+            }
+            sb.append(idx).append(". ").append(record.getSkillId()).append("\n");
+            sb.append("   描述：").append(record.getDescription() != null ? record.getDescription() : "").append("\n\n");
+            idx++;
+        }
+
+        return sb.toString();
+    }
+
+    /**
      * 生成技能摘要
      */
     public String buildSkillsSummary() {
